@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Show - Mặt trăng xoay quanh Trái đất</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@2.6.2/build/phaser.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000011;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #phaser-game {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+        }
+        
+        button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            background: #357abd;
+        }
+        
+        .slider-container {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .slider-label {
+            font-size: 12px;
+            min-width: 80px;
+        }
+        
+        .slider {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #4a90e2;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .slider::-webkit-slider-thumb:hover {
+            background: #357abd;
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #4a90e2;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+        }
+        
+        .slider::-moz-range-thumb:hover {
+            background: #357abd;
+        }
+        
+        .slider-value {
+            font-size: 12px;
+            min-width: 40px;
+            text-align: right;
+            color: #4a90e2;
+        }
+        
+        .status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            z-index: 200;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h3>🌙 Drone Show - Mặt trăng & Trái đất</h3>
+        <p id="phase-info">Chuẩn bị cất cánh...</p>
+        <p>100 drones</p>
+    </div>
+    
+    <div class="controls">
+        <button onclick="restartShow()">Khởi động lại</button>
+        <button onclick="togglePause()">Tạm dừng</button>
+        <div class="slider-container">
+            <span class="slider-label">Tốc độ:</span>
+            <input type="range" id="speed-slider" class="slider" min="0.1" max="3" step="0.1" value="1" oninput="updateSpeed(this.value)">
+            <span class="slider-value" id="speed-value">1.0x</span>
+        </div>
+        <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px;">
+            <button onclick="changeFormation('moon')" id="btn-moon" style="background: #4a90e2;">🌙 Mặt trăng</button>
+            <button onclick="changeFormation('lotus')" id="btn-lotus" style="background: #e91e63;">🌸 Hoa sen</button>
+            <button onclick="changeFormation('wang')" id="btn-wang" style="background: #ffc107;">王 Chữ Vương</button>
+            <button onclick="changeFormation('cat')" id="btn-cat" style="background: #ff9800;">🐱 Con mèo</button>
+        </div>
+    </div>
+    
+    <div class="status" id="status-text"></div>
+    <div id="phaser-game"></div>
+    
+    <script>
+        // Màu sắc cho các hình dạng
+        const COLORS = {
+            moon: 0xFFFFFF,      // Trắng neon - Mặt trăng
+            lotus: 0xFF69B4,      // Hồng - Hoa sen
+            wang: 0xFFD700,      // Vàng - Chữ Vương
+            cat: 0xFFA500        // Cam - Con mèo
+        };
+        const EARTH_COLOR = 0x00BFFF; // Lam neon
+        const DRONE_COUNT = 100;
+        
+        // Biến global cho tốc độ và hình dạng
+        let globalSpeedMultiplier = 1.0;
+        let currentFormation = 'moon'; // moon, lotus, wang, cat
+        
+        // Lớp Drone với vật lý thật
+        class DroneDot {
+            constructor(game, startX, startY, targetX, targetY, targetAngle, color = COLORS.moon) {
+                this.game = game;
+                this.startX = startX;
+                this.startY = startY;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.targetAngle = targetAngle;
+                this.color = color;
+                
+                // Vị trí hiện tại
+                this.x = startX;
+                this.y = startY;
+                
+                // Vật lý
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.acceleration = 0.15;
+                this.maxSpeed = 8;
+                this.damping = 0.95; // Ma sát không khí
+                
+                // Trạng thái
+                this.state = 'waiting'; // waiting, taking-off, forming, formed
+                this.takeoffDelay = Math.random() * 1000; // Delay ngẫu nhiên
+                this.takeoffStartTime = 0;
+                this.formationProgress = 0;
+                
+                // Tạo sprite
+                this.createSprite();
+            }
+            
+            updateColor(newColor) {
+                this.color = newColor;
+                if (this.sprite) {
+                    // Tạo lại texture với màu mới
+                    this.createSprite();
+                }
+            }
+            
+            createSprite() {
+                // Lưu alpha hiện tại nếu có
+                const oldAlpha = this.sprite ? this.sprite.alpha : 0;
+                
+                // Xóa sprite cũ nếu có
+                if (this.sprite) {
+                    this.sprite.destroy();
+                }
+                
+                // Chuyển đổi màu hex sang RGB
+                const r = (this.color >> 16) & 0xFF;
+                const g = (this.color >> 8) & 0xFF;
+                const b = this.color & 0xFF;
+                
+                // Tạo texture cho drone với hiệu ứng glow
+                const bmd = this.game.add.bitmapData(16, 16);
+                const ctx = bmd.ctx;
+                
+                // Vẽ glow layer 1 (lớn nhất, mờ nhất)
+                const gradient1 = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+                gradient1.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
+                gradient1.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+                ctx.fillStyle = gradient1;
+                ctx.beginPath();
+                ctx.arc(8, 8, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Vẽ glow layer 2 (trung bình)
+                const gradient2 = ctx.createRadialGradient(8, 8, 0, 8, 8, 6);
+                gradient2.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.6)`);
+                gradient2.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+                ctx.fillStyle = gradient2;
+                ctx.beginPath();
+                ctx.arc(8, 8, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Chấm sáng chính
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 1)`;
+                ctx.beginPath();
+                ctx.arc(8, 8, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                this.sprite = this.game.add.sprite(this.x, this.y, bmd);
+                this.sprite.anchor.set(0.5);
+                this.sprite.alpha = oldAlpha;
+                this.sprite.blendMode = Phaser.blendModes.ADD || 2; // ADD blend mode
+            }
+            
+            update() {
+                const now = this.game.time.now;
+                
+                switch(this.state) {
+                    case 'waiting':
+                        // Chờ đến lượt cất cánh
+                        if (now >= this.takeoffStartTime + this.takeoffDelay) {
+                            this.state = 'taking-off';
+                            this.sprite.alpha = 0.3;
+                        }
+                        break;
+                        
+                    case 'taking-off':
+                        // Bay lên với gia tốc (áp dụng speed multiplier)
+                        this.velocityY -= this.acceleration * 1.5 * globalSpeedMultiplier;
+                        this.velocityX += (this.targetX - this.x) * 0.01 * globalSpeedMultiplier;
+                        
+                        // Giới hạn tốc độ
+                        const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+                        const maxSpeed = this.maxSpeed * globalSpeedMultiplier;
+                        if (speed > maxSpeed) {
+                            this.velocityX = (this.velocityX / speed) * maxSpeed;
+                            this.velocityY = (this.velocityY / speed) * maxSpeed;
+                        }
+                        
+                        // Cập nhật vị trí
+                        this.x += this.velocityX;
+                        this.y += this.velocityY;
+                        
+                        // Tăng độ sáng khi bay lên
+                        this.sprite.alpha = Math.min(this.sprite.alpha + 0.02, 1);
+                        
+                        // Chuyển sang giai đoạn dàn hình khi đã bay lên đủ cao
+                        if (this.y < this.game.height * 0.6) {
+                            this.state = 'forming';
+                            this.formationProgress = 0;
+                        }
+                        break;
+                        
+                    case 'forming':
+                        // Dàn hình và kết hình - di chuyển đến vị trí đích
+                        const dx = this.targetX - this.x;
+                        const dy = this.targetY - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance > 5) {
+                            // Tính toán lực hướng về đích (áp dụng speed multiplier)
+                            const forceX = (dx / distance) * this.acceleration * 2 * globalSpeedMultiplier;
+                            const forceY = (dy / distance) * this.acceleration * 2 * globalSpeedMultiplier;
+                            
+                            // Áp dụng lực
+                            this.velocityX += forceX;
+                            this.velocityY += forceY;
+                            
+                            // Ma sát không khí
+                            this.velocityX *= this.damping;
+                            this.velocityY *= this.damping;
+                            
+                            // Giới hạn tốc độ
+                            const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+                            const maxFormingSpeed = this.maxSpeed * 0.6 * globalSpeedMultiplier;
+                            if (currentSpeed > maxFormingSpeed) {
+                                this.velocityX = (this.velocityX / currentSpeed) * maxFormingSpeed;
+                                this.velocityY = (this.velocityY / currentSpeed) * maxFormingSpeed;
+                            }
+                            
+                            // Cập nhật vị trí
+                            this.x += this.velocityX;
+                            this.y += this.velocityY;
+                            
+                            // Cập nhật progress
+                            this.formationProgress = 1 - (distance / 200);
+                        } else {
+                            // Đã đến vị trí đích
+                            this.state = 'formed';
+                            this.x = this.targetX;
+                            this.y = this.targetY;
+                            this.velocityX = 0;
+                            this.velocityY = 0;
+                            this.sprite.alpha = 1;
+                        }
+                        break;
+                        
+                    case 'formed':
+                        // Đã kết hình, rung nhẹ tại vị trí (targetX và targetY sẽ được cập nhật từ scene)
+                        const time = this.game.time.now * 0.001;
+                        this.x = this.targetX + Math.sin(time + this.targetAngle) * 0.5;
+                        this.y = this.targetY + Math.cos(time + this.targetAngle) * 0.5;
+                        break;
+                }
+                
+                // Cập nhật sprite
+                this.sprite.x = this.x;
+                this.sprite.y = this.y;
+            }
+            
+            startTakeoff(startTime) {
+                this.takeoffStartTime = startTime;
+            }
+        }
+        
+        // Scene chính
+        var DroneShowGame = {
+            preload: function() {
+                // Không cần preload vì tạo texture động
+            },
+            
+            create: function() {
+                const width = this.game.width;
+                const height = this.game.height;
+                
+                // Tạo background không gian
+                this.createSpaceBackground();
+                
+                // Tạo Trái đất ở trung tâm
+                this.createEarth();
+                
+                // Tạo quỹ đạo
+                this.orbitRadius = Math.min(width, height) * 0.25;
+                this.orbitCenterX = width / 2;
+                this.orbitCenterY = height / 2;
+                this.orbitAngle = 0;
+                this.orbitSpeed = 0.002; // Tốc độ quay
+                
+                // Khởi tạo drones
+                this.drones = [];
+                this.formationPoints = [];
+                this.initDrones();
+                
+                // Status elements
+                this.statusText = document.getElementById('status-text');
+                this.phaseInfo = document.getElementById('phase-info');
+                
+                // Bắt đầu trình diễn
+                this.startShow();
+            },
+            
+            createSpaceBackground: function() {
+                const width = this.game.width;
+                const height = this.game.height;
+                
+                // Gradient background
+                const bmd = this.game.add.bitmapData(width, height);
+                const ctx = bmd.ctx;
+                
+                const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                gradient.addColorStop(0, '#000011');
+                gradient.addColorStop(0.5, '#000033');
+                gradient.addColorStop(1, '#000022');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+                
+                // Thêm các ngôi sao
+                for (let i = 0; i < 200; i++) {
+                    const x = Math.random() * width;
+                    const y = Math.random() * height * 0.8;
+                    const size = Math.random() * 2 + 0.5;
+                    const alpha = Math.random() * 0.5 + 0.3;
+                    
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                this.game.add.sprite(0, 0, bmd);
+            },
+            
+            createEarth: function() {
+                const centerX = this.game.width / 2;
+                const centerY = this.game.height / 2;
+                const radius = 60;
+                
+                // Tạo Trái đất với hiệu ứng glow
+                const bmd = this.game.add.bitmapData(radius * 2 + 20, radius * 2 + 20);
+                const ctx = bmd.ctx;
+                
+                // Vẽ glow
+                const glowGradient = ctx.createRadialGradient(
+                    radius + 10, radius + 10, radius,
+                    radius + 10, radius + 10, radius + 20
+                );
+                glowGradient.addColorStop(0, 'rgba(0, 191, 255, 0.8)');
+                glowGradient.addColorStop(0.5, 'rgba(0, 191, 255, 0.4)');
+                glowGradient.addColorStop(1, 'rgba(0, 191, 255, 0)');
+                
+                ctx.fillStyle = glowGradient;
+                ctx.beginPath();
+                ctx.arc(radius + 10, radius + 10, radius + 20, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Vẽ Trái đất
+                const earthGradient = ctx.createRadialGradient(
+                    radius + 10, radius + 10, 0,
+                    radius + 10, radius + 10, radius
+                );
+                earthGradient.addColorStop(0, '#00D9FF');
+                earthGradient.addColorStop(0.7, '#00BFFF');
+                earthGradient.addColorStop(1, '#0080FF');
+                
+                ctx.fillStyle = earthGradient;
+                ctx.beginPath();
+                ctx.arc(radius + 10, radius + 10, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Thêm chi tiết
+                ctx.fillStyle = 'rgba(0, 150, 200, 0.3)';
+                ctx.beginPath();
+                ctx.arc(radius + 10, radius + 10, radius * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                this.earth = this.game.add.sprite(centerX, centerY, bmd);
+                this.earth.anchor.set(0.5);
+                
+                // Animation quay nhẹ
+                this.game.add.tween(this.earth).to({
+                    rotation: Math.PI * 2
+                }, 20000, Phaser.Easing.Linear.None, true, 0, -1);
+            },
+            
+            createFormation: function(formationType) {
+                this.formationPoints = [];
+                const centerX = this.orbitCenterX;
+                const centerY = this.orbitCenterY - this.orbitRadius;
+                
+                switch(formationType) {
+                    case 'moon':
+                        this.createMoonFormation(centerX, centerY);
+                        break;
+                    case 'lotus':
+                        this.createLotusFormation(centerX, centerY);
+                        break;
+                    case 'wang':
+                        this.createWangFormation(centerX, centerY);
+                        break;
+                    case 'cat':
+                        this.createCatFormation(centerX, centerY);
+                        break;
+                }
+            },
+            
+            createMoonFormation: function(centerX, centerY) {
+                const moonRadius = 80;
+                for (let i = 0; i < DRONE_COUNT; i++) {
+                    const angle = (i / DRONE_COUNT) * Math.PI * 2;
+                    const radiusVariation = moonRadius + (Math.random() - 0.5) * 20;
+                    this.formationPoints.push({
+                        angle: angle,
+                        radius: radiusVariation,
+                        baseX: centerX,
+                        baseY: centerY,
+                        color: COLORS.moon
+                    });
+                }
+            },
+            
+            createLotusFormation: function(centerX, centerY) {
+                const points = [];
+                // Tâm hoa sen (nhụy)
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const radius = 15;
+                    points.push({
+                        x: centerX + Math.cos(angle) * radius,
+                        y: centerY + Math.sin(angle) * radius,
+                        color: COLORS.lotus
+                    });
+                }
+                
+                // Các lớp cánh hoa sen
+                const layers = [20, 35, 50, 65, 80];
+                layers.forEach((radius, layerIndex) => {
+                    const petals = 8 + layerIndex * 2;
+                    for (let i = 0; i < petals; i++) {
+                        const angle = (i / petals) * Math.PI * 2;
+                        const x = centerX + Math.cos(angle) * radius;
+                        const y = centerY + Math.sin(angle) * radius;
+                        points.push({
+                            x: x,
+                            y: y,
+                            color: COLORS.lotus
+                        });
+                    }
+                });
+                
+                // Điền đủ 100 điểm
+                while (points.length < DRONE_COUNT) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 30 + Math.random() * 50;
+                    points.push({
+                        x: centerX + Math.cos(angle) * radius,
+                        y: centerY + Math.sin(angle) * radius,
+                        color: COLORS.lotus
+                    });
+                }
+                
+                // Chuyển đổi sang format formationPoints
+                points.slice(0, DRONE_COUNT).forEach((point, i) => {
+                    const dx = point.x - centerX;
+                    const dy = point.y - centerY;
+                    const angle = Math.atan2(dy, dx);
+                    const radius = Math.sqrt(dx * dx + dy * dy);
+                    this.formationPoints.push({
+                        angle: angle,
+                        radius: radius,
+                        baseX: centerX,
+                        baseY: centerY,
+                        color: point.color
+                    });
+                });
+            },
+            
+            createWangFormation: function(centerX, centerY) {
+                const points = [];
+                const scale = 2;
+                
+                // Chữ Vương (王) - 3 nét ngang và 1 nét dọc
+                // Nét ngang 1
+                for (let x = -40; x <= 40; x += 5) {
+                    points.push({x: centerX + x * scale, y: centerY - 50 * scale, color: COLORS.wang});
+                }
+                // Nét ngang 2
+                for (let x = -40; x <= 40; x += 5) {
+                    points.push({x: centerX + x * scale, y: centerY, color: COLORS.wang});
+                }
+                // Nét ngang 3
+                for (let x = -40; x <= 40; x += 5) {
+                    points.push({x: centerX + x * scale, y: centerY + 50 * scale, color: COLORS.wang});
+                }
+                // Nét dọc
+                for (let y = -50; y <= 50; y += 5) {
+                    points.push({x: centerX, y: centerY + y * scale, color: COLORS.wang});
+                }
+                
+                // Điền đủ 100 điểm
+                while (points.length < DRONE_COUNT) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * 60;
+                    points.push({
+                        x: centerX + Math.cos(angle) * radius,
+                        y: centerY + Math.sin(angle) * radius,
+                        color: COLORS.wang
+                    });
+                }
+                
+                // Chuyển đổi sang format formationPoints
+                points.slice(0, DRONE_COUNT).forEach((point) => {
+                    const dx = point.x - centerX;
+                    const dy = point.y - centerY;
+                    const angle = Math.atan2(dy, dx);
+                    const radius = Math.sqrt(dx * dx + dy * dy);
+                    this.formationPoints.push({
+                        angle: angle,
+                        radius: radius,
+                        baseX: centerX,
+                        baseY: centerY,
+                        color: point.color
+                    });
+                });
+            },
+            
+            createCatFormation: function(centerX, centerY) {
+                const points = [];
+                const scale = 1.5;
+                
+                // Đầu mèo (hình tròn)
+                for (let i = 0; i < 30; i++) {
+                    const angle = (i / 30) * Math.PI * 2;
+                    const radius = 40;
+                    points.push({
+                        x: centerX + Math.cos(angle) * radius * scale,
+                        y: centerY - 20 + Math.sin(angle) * radius * scale,
+                        color: COLORS.cat
+                    });
+                }
+                
+                // Tai trái
+                for (let i = 0; i < 8; i++) {
+                    const angle = Math.PI * 0.7 + (i / 8) * 0.3;
+                    const radius = 25;
+                    points.push({
+                        x: centerX - 30 + Math.cos(angle) * radius * scale,
+                        y: centerY - 50 + Math.sin(angle) * radius * scale,
+                        color: COLORS.cat
+                    });
+                }
+                
+                // Tai phải
+                for (let i = 0; i < 8; i++) {
+                    const angle = Math.PI * 0.2 + (i / 8) * 0.3;
+                    const radius = 25;
+                    points.push({
+                        x: centerX + 30 + Math.cos(angle) * radius * scale,
+                        y: centerY - 50 + Math.sin(angle) * radius * scale,
+                        color: COLORS.cat
+                    });
+                }
+                
+                // Mắt trái
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i / 5) * Math.PI * 2;
+                    const radius = 8;
+                    points.push({
+                        x: centerX - 15 + Math.cos(angle) * radius * scale,
+                        y: centerY - 20 + Math.sin(angle) * radius * scale,
+                        color: COLORS.cat
+                    });
+                }
+                
+                // Mắt phải
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i / 5) * Math.PI * 2;
+                    const radius = 8;
+                    points.push({
+                        x: centerX + 15 + Math.cos(angle) * radius * scale,
+                        y: centerY - 20 + Math.sin(angle) * radius * scale,
+                        color: COLORS.cat
+                    });
+                }
+                
+                // Mũi
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i / 4) * Math.PI * 2;
+                    const radius = 5;
+                    points.push({
+                        x: centerX + Math.cos(angle) * radius * scale,
+                        y: centerY - 5 + Math.sin(angle) * radius * scale,
+                        color: COLORS.cat
+                    });
+                }
+                
+                // Miệng
+                points.push({x: centerX, y: centerY + 10, color: COLORS.cat});
+                points.push({x: centerX - 10, y: centerY + 15, color: COLORS.cat});
+                points.push({x: centerX + 10, y: centerY + 15, color: COLORS.cat});
+                
+                // Thân (hình oval)
+                for (let i = 0; i < 25; i++) {
+                    const angle = (i / 25) * Math.PI * 2;
+                    const radiusX = 35;
+                    const radiusY = 50;
+                    points.push({
+                        x: centerX + Math.cos(angle) * radiusX * scale,
+                        y: centerY + 30 + Math.sin(angle) * radiusY * scale,
+                        color: COLORS.cat
+                    });
+                }
+                
+                // Điền đủ 100 điểm
+                while (points.length < DRONE_COUNT) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 20 + Math.random() * 60;
+                    points.push({
+                        x: centerX + Math.cos(angle) * radius,
+                        y: centerY + Math.sin(angle) * radius,
+                        color: COLORS.cat
+                    });
+                }
+                
+                // Chuyển đổi sang format formationPoints
+                points.slice(0, DRONE_COUNT).forEach((point) => {
+                    const dx = point.x - centerX;
+                    const dy = point.y - centerY;
+                    const angle = Math.atan2(dy, dx);
+                    const radius = Math.sqrt(dx * dx + dy * dy);
+                    this.formationPoints.push({
+                        angle: angle,
+                        radius: radius,
+                        baseX: centerX,
+                        baseY: centerY,
+                        color: point.color
+                    });
+                });
+            },
+            
+            initDrones: function() {
+                const width = this.game.width;
+                const height = this.game.height;
+                
+                // Xóa drones cũ nếu có
+                if (this.drones) {
+                    this.drones.forEach(drone => {
+                        if (drone.sprite) drone.sprite.destroy();
+                    });
+                }
+                this.drones = [];
+                
+                // Tạo formation points
+                this.createFormation(currentFormation);
+                
+                // Tạo 100 drones bắt đầu từ dưới màn hình
+                for (let i = 0; i < DRONE_COUNT; i++) {
+                    const point = this.formationPoints[i];
+                    const targetX = point.baseX + Math.cos(point.angle) * point.radius;
+                    const targetY = point.baseY + Math.sin(point.angle) * point.radius;
+                    
+                    // Vị trí xuất phát ngẫu nhiên ở dưới màn hình
+                    const startX = width * 0.3 + Math.random() * width * 0.4;
+                    const startY = height + 20 + Math.random() * 30;
+                    
+                    const drone = new DroneDot(
+                        this.game,
+                        startX,
+                        startY,
+                        targetX,
+                        targetY,
+                        point.angle,
+                        point.color
+                    );
+                    
+                    this.drones.push(drone);
+                }
+            },
+            
+            startShow: function() {
+                const startTime = this.game.time.now;
+                
+                // Bắt đầu cất cánh cho tất cả drones
+                this.drones.forEach(drone => {
+                    drone.startTakeoff(startTime);
+                });
+                
+                // Cập nhật status
+                if (this.statusText) {
+                    this.statusText.textContent = '🚁 Drone đang cất cánh...';
+                }
+                if (this.phaseInfo) {
+                    this.phaseInfo.textContent = 'Giai đoạn: Cất cánh';
+                }
+                
+                // Chuyển sang giai đoạn dàn hình
+                this.game.time.events.add(3000, () => {
+                    if (this.statusText) {
+                        this.statusText.textContent = '✨ Đang dàn hình...';
+                    }
+                    if (this.phaseInfo) {
+                        this.phaseInfo.textContent = 'Giai đoạn: Dàn hình';
+                    }
+                });
+                
+                // Chuyển sang giai đoạn kết hình
+                this.game.time.events.add(6000, () => {
+                    const formationNames = {
+                        'moon': '🌙 Mặt trăng',
+                        'lotus': '🌸 Hoa sen',
+                        'wang': '王 Chữ Vương',
+                        'cat': '🐱 Con mèo'
+                    };
+                    if (this.statusText) {
+                        this.statusText.textContent = formationNames[currentFormation] + ' đang kết hình...';
+                    }
+                    if (this.phaseInfo) {
+                        this.phaseInfo.textContent = 'Giai đoạn: Kết hình';
+                    }
+                });
+                
+                // Hoàn thành
+                this.game.time.events.add(10000, () => {
+                    const formationNames = {
+                        'moon': '🌙 Mặt trăng',
+                        'lotus': '🌸 Hoa sen',
+                        'wang': '王 Chữ Vương',
+                        'cat': '🐱 Con mèo'
+                    };
+                    if (this.statusText) {
+                        this.statusText.textContent = formationNames[currentFormation] + ' đã hoàn thành!';
+                    }
+                    if (this.phaseInfo) {
+                        this.phaseInfo.textContent = 'Giai đoạn: Hoàn thành - Đang quay quanh Trái đất';
+                    }
+                    
+                    // Ẩn status sau 2 giây
+                    this.game.time.events.add(2000, () => {
+                        if (this.statusText) {
+                            this.statusText.textContent = '';
+                        }
+                    });
+                });
+            },
+            
+            update: function() {
+                // Cập nhật quỹ đạo (áp dụng speed multiplier)
+                this.orbitAngle += this.orbitSpeed * globalSpeedMultiplier;
+                
+                // Cập nhật vị trí đích cho các drones (quỹ đạo)
+                if (this.formationPoints && this.drones) {
+                    this.drones.forEach((drone, index) => {
+                        if (index < this.formationPoints.length) {
+                            const point = this.formationPoints[index];
+                            const orbitX = this.orbitCenterX + Math.cos(this.orbitAngle) * this.orbitRadius;
+                            const orbitY = this.orbitCenterY + Math.sin(this.orbitAngle) * this.orbitRadius;
+                            
+                            // Vị trí trên hình dạng
+                            const targetX = orbitX + Math.cos(point.angle + this.orbitAngle) * point.radius;
+                            const targetY = orbitY + Math.sin(point.angle + this.orbitAngle) * point.radius;
+                            
+                            // Cập nhật vị trí đích (cho cả khi đang bay và đã kết hình)
+                            drone.targetX = targetX;
+                            drone.targetY = targetY;
+                            
+                            // Cập nhật màu nếu cần
+                            if (drone.color !== point.color) {
+                                drone.updateColor(point.color);
+                            }
+                        }
+                        
+                        // Cập nhật drone
+                        drone.update();
+                    });
+                }
+            }
+        };
+        
+        // Cấu hình Phaser 2
+        var game;
+        var isPaused = false;
+        
+        function initGame() {
+            if (game) {
+                game.destroy();
+            }
+            
+            game = new Phaser.Game(
+                window.innerWidth,
+                window.innerHeight,
+                Phaser.AUTO,
+                'phaser-game',
+                DroneShowGame,
+                false,
+                false
+            );
+        }
+        
+        function restartShow() {
+            // Reset speed về mặc định
+            globalSpeedMultiplier = 1.0;
+            const speedSlider = document.getElementById('speed-slider');
+            const speedValueElement = document.getElementById('speed-value');
+            if (speedSlider) {
+                speedSlider.value = '1';
+            }
+            if (speedValueElement) {
+                speedValueElement.textContent = '1.0x';
+            }
+            
+            initGame();
+            isPaused = false;
+        }
+        
+        function togglePause() {
+            if (!game) return;
+            if (isPaused) {
+                game.paused = false;
+                isPaused = false;
+            } else {
+                game.paused = true;
+                isPaused = true;
+            }
+        }
+        
+        function updateSpeed(value) {
+            globalSpeedMultiplier = parseFloat(value);
+            const speedValueElement = document.getElementById('speed-value');
+            if (speedValueElement) {
+                speedValueElement.textContent = globalSpeedMultiplier.toFixed(1) + 'x';
+            }
+        }
+        
+        function changeFormation(formationType) {
+            currentFormation = formationType;
+            
+            // Cập nhật màu nút
+            ['moon', 'lotus', 'wang', 'cat'].forEach(type => {
+                const btn = document.getElementById('btn-' + type);
+                if (btn) {
+                    if (type === formationType) {
+                        btn.style.opacity = '1';
+                        btn.style.transform = 'scale(1.1)';
+                    } else {
+                        btn.style.opacity = '0.6';
+                        btn.style.transform = 'scale(1)';
+                    }
+                }
+            });
+            
+            // Cập nhật formation trong game
+            if (game && game.state) {
+                // Phaser 2 sử dụng game.state để truy cập state hiện tại
+                const scene = game.state.getCurrentState ? game.state.getCurrentState() : game.state;
+                if (scene && scene.createFormation) {
+                    // Tạo formation mới
+                    scene.createFormation(formationType);
+                    
+                    // Cập nhật target cho các drones
+                    if (scene.drones && scene.formationPoints) {
+                        scene.drones.forEach((drone, index) => {
+                            if (index < scene.formationPoints.length) {
+                                const point = scene.formationPoints[index];
+                                const orbitX = scene.orbitCenterX + Math.cos(scene.orbitAngle) * scene.orbitRadius;
+                                const orbitY = scene.orbitCenterY + Math.sin(scene.orbitAngle) * scene.orbitRadius;
+                                
+                                drone.targetX = orbitX + Math.cos(point.angle + scene.orbitAngle) * point.radius;
+                                drone.targetY = orbitY + Math.sin(point.angle + scene.orbitAngle) * point.radius;
+                                
+                                // Cập nhật màu
+                                if (drone.color !== point.color) {
+                                    drone.updateColor(point.color);
+                                }
+                                
+                                // Reset về trạng thái forming để bay đến vị trí mới
+                                if (drone.state === 'formed') {
+                                    drone.state = 'forming';
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Xử lý resize
+        window.addEventListener('resize', () => {
+            if (game) {
+                game.scale.setGameSize(window.innerWidth, window.innerHeight);
+            }
+        });
+        
+        // Khởi động game
+        initGame();
+    </script>
+</body>
+</html>
