@@ -27,6 +27,11 @@
             position: absolute;
             bottom: 30px;
             right: 30px;
+            display: none;
+        }
+        .next-button.visible {
+            display: block;
+        }
             padding: 12px 24px;
             background: linear-gradient(135deg, #ff0080, #9d00ff);
             color: white;
@@ -49,11 +54,74 @@
         .next-button:active {
             transform: translateY(0);
         }
+        .input-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 30px 40px;
+            border-radius: 15px;
+            border: 2px solid #ff0080;
+            box-shadow: 0 0 30px rgba(255, 0, 128, 0.5);
+            z-index: 200;
+            text-align: center;
+        }
+        .input-panel.hidden {
+            display: none;
+        }
+        .input-panel h3 {
+            color: #ff0080;
+            margin: 0 0 20px 0;
+            font-size: 18px;
+            text-shadow: 0 0 10px #ff0080;
+        }
+        .input-panel input {
+            padding: 12px 20px;
+            font-size: 16px;
+            border: 2px solid #9d00ff;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #ffffff;
+            width: 300px;
+            margin-bottom: 15px;
+            outline: none;
+        }
+        .input-panel input:focus {
+            border-color: #ff0080;
+            box-shadow: 0 0 15px rgba(255, 0, 128, 0.3);
+        }
+        .input-panel .hint {
+            color: #9d00ff;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        .ok-button {
+            padding: 10px 30px;
+            background: linear-gradient(135deg, #ff0080, #9d00ff);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .ok-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 0, 128, 0.6);
+        }
     </style>
 </head>
 <body>
-    <div class="info">
-        🌊 Sứa Neon 3D
+    <div class="info" id="infoText">
+        Nhập tên đội hình
+    </div>
+    <div class="input-panel" id="inputPanel">
+        <h3>🎨 Tạo Đội Hình</h3>
+        <input type="text" id="formationInput" placeholder="Nhập tên đội hình..." onkeypress="handleKeyPress(event)">
+        <div class="hint">Gợi ý: jellyfish, sunflower, tiger, dragon</div>
+        <button class="ok-button" onclick="createFormationFromText()">OK</button>
     </div>
     <button class="next-button" onclick="switchFormation()">NEXT</button>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -64,6 +132,7 @@
     <script src="js/events.js"></script>
     <script src="js/animation.js"></script>
     <script src="js/controller.js"></script>
+    <script src="js/text-formation.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

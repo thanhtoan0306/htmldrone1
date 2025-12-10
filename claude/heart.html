@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trái Tim Neon 3D</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0015 0%, #1a0033 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff1493;
+            text-align: center;
+            font-size: 24px;
+            text-shadow: 0 0 10px #ff1493, 0 0 20px #ff1493;
+            z-index: 10;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="info">♥ Trái Tim Neon ♥</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, particles = [];
+        const particleCount = 2000;
+        
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 15;
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            
+            createParticles();
+            
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        function createParticles() {
+            for (let i = 0; i < particleCount; i++) {
+                const geometry = new THREE.SphereGeometry(0.05, 8, 8);
+                const material = new THREE.MeshBasicMaterial({
+                    color: new THREE.Color().setHSL(0.95 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.3),
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const particle = new THREE.Mesh(geometry, material);
+                
+                // Vị trí ngẫu nhiên ban đầu (phân tán rộng)
+                particle.position.x = (Math.random() - 0.5) * 30;
+                particle.position.y = (Math.random() - 0.5) * 30;
+                particle.position.z = (Math.random() - 0.5) * 30;
+                
+                // Tính vị trí đích trên hình trái tim
+                const t = (i / particleCount) * Math.PI * 2;
+                const targetX = 16 * Math.pow(Math.sin(t), 3) * 0.3;
+                const targetY = (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 0.3;
+                const targetZ = (Math.random() - 0.5) * 2;
+                
+                particle.userData = {
+                    targetX: targetX,
+                    targetY: targetY,
+                    targetZ: targetZ,
+                    velocityX: 0,
+                    velocityY: 0,
+                    velocityZ: 0,
+                    startTime: Math.random() * 3
+                };
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            // Thêm ánh sáng điểm cho hiệu ứng neon
+            const light1 = new THREE.PointLight(0xff1493, 2, 50);
+            light1.position.set(0, 0, 10);
+            scene.add(light1);
+            
+            const light2 = new THREE.PointLight(0xff69b4, 1.5, 50);
+            light2.position.set(5, 5, 5);
+            scene.add(light2);
+            
+            const light3 = new THREE.PointLight(0xff1493, 1.5, 50);
+            light3.position.set(-5, -5, 5);
+            scene.add(light3);
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = Date.now() * 0.001;
+            
+            particles.forEach((particle, i) => {
+                if (time > particle.userData.startTime) {
+                    // Tính lực hút về vị trí đích (vật lý đơn giản)
+                    const dx = particle.userData.targetX - particle.position.x;
+                    const dy = particle.userData.targetY - particle.position.y;
+                    const dz = particle.userData.targetZ - particle.position.z;
+                    
+                    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    // Lực hút với damping (chậm hơn, như drone)
+                    const force = 0.005;
+                    const damping = 0.92;
+                    
+                    particle.userData.velocityX += dx * force;
+                    particle.userData.velocityY += dy * force;
+                    particle.userData.velocityZ += dz * force;
+                    
+                    // Giới hạn tốc độ tối đa (như drone)
+                    const maxSpeed = 0.05;
+                    const speed = Math.sqrt(
+                        particle.userData.velocityX ** 2 + 
+                        particle.userData.velocityY ** 2 + 
+                        particle.userData.velocityZ ** 2
+                    );
+                    if (speed > maxSpeed) {
+                        particle.userData.velocityX = (particle.userData.velocityX / speed) * maxSpeed;
+                        particle.userData.velocityY = (particle.userData.velocityY / speed) * maxSpeed;
+                        particle.userData.velocityZ = (particle.userData.velocityZ / speed) * maxSpeed;
+                    }
+                    
+                    particle.userData.velocityX *= damping;
+                    particle.userData.velocityY *= damping;
+                    particle.userData.velocityZ *= damping;
+                    
+                    particle.position.x += particle.userData.velocityX;
+                    particle.position.y += particle.userData.velocityY;
+                    particle.position.z += particle.userData.velocityZ;
+                    
+                    // Dao động nhẹ khi đã đến vị trí
+                    if (distance < 0.5) {
+                        particle.position.y += Math.sin(time * 2 + i * 0.1) * 0.01;
+                    }
+                }
+                
+                // Hiệu ứng sáng lấp lánh
+                particle.material.opacity = 0.6 + Math.sin(time * 3 + i * 0.5) * 0.2;
+            });
+            
+            // Xoay nhẹ toàn bộ scene
+            scene.rotation.y = Math.sin(time * 0.2) * 0.2;
+            scene.rotation.x = Math.sin(time * 0.15) * 0.1;
+            
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        init();
+        animate();
+    </script>
+</body>
+</html>

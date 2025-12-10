@@ -76,6 +76,53 @@ function animateParticles() {
         particleGroup.position.y = Math.sin(App.time * 0.6) * 0.8;
         // Tự xoay chậm
         particleGroup.rotation.y += 0.003;
+        
+    } else if (App.currentFormation === 'tiger') {
+        particles.forEach(particle => {
+            const targetX = particle.userData.targetX;
+            const targetY = particle.userData.targetY;
+            const targetZ = particle.userData.targetZ;
+            
+            // Animation nhẹ nhàng cho mặt hổ
+            const pulse = Math.sin(App.time * 1.8 + particle.userData.phase) * 0.08;
+            const sway = Math.cos(App.time * 1.5 + particle.userData.index * 0.05) * 0.06;
+            
+            particle.position.x = targetX + sway;
+            particle.position.y = targetY + pulse;
+            particle.position.z = targetZ + sway * 0.5;
+            
+            particle.material.opacity = 0.7 + Math.sin(App.time * 2.5 + particle.userData.phase) * 0.2;
+        });
+        
+        // Floating motion cho toàn bộ group
+        particleGroup.position.y = Math.sin(App.time * 0.7) * 0.6;
+        // Tự xoay chậm
+        particleGroup.rotation.y += 0.0025;
+        
+    } else if (App.currentFormation === 'dragon') {
+        particles.forEach(particle => {
+            const targetX = particle.userData.targetX;
+            const targetY = particle.userData.targetY;
+            const targetZ = particle.userData.targetZ;
+            
+            // Animation bay lượn cho rồng
+            const segmentIndex = particle.userData.segmentIndex || 0;
+            const wave = Math.sin(App.time * 1.2 + segmentIndex * 0.1) * 0.2;
+            const sway = Math.cos(App.time * 1.0 + particle.userData.index * 0.03) * 0.15;
+            
+            particle.position.x = targetX + sway * 0.5;
+            particle.position.y = targetY + wave;
+            particle.position.z = targetZ + sway;
+            
+            particle.material.opacity = 0.7 + Math.sin(App.time * 2 + particle.userData.phase) * 0.2;
+        });
+        
+        // Bay lượn cho toàn bộ group - tạo chuyển động uốn lượn
+        particleGroup.position.y = Math.sin(App.time * 0.5) * 1.5;
+        particleGroup.position.x = Math.cos(App.time * 0.3) * 0.8;
+        // Tự xoay chậm với góc nghiêng
+        particleGroup.rotation.y += 0.002;
+        particleGroup.rotation.z = Math.sin(App.time * 0.4) * 0.1; // Nghiêng khi bay
     }
 }
 

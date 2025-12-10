@@ -3,11 +3,16 @@ function init() {
     initScene();
     createParticleSystem();
     initializeParticles(1000); // Tạo 1000 particles
-    setJellyfishFormationInitial(); // Bắt đầu với đội hình sứa (không transition)
+    // Không tạo đội hình ban đầu - chờ input từ user
     createOceanParticles();
     setupEvents();
     App.lastFrameTime = performance.now() / 1000;
     animate();
+    
+    // Hiển thị input panel
+    setTimeout(() => {
+        showInputPanel();
+    }, 100);
 }
 
 // Khởi chạy ứng dụng
