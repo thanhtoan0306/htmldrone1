@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trái Tim Neon 3D</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0015 0%, #1a0033 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff1493;
+            text-align: center;
+            font-size: 24px;
+            text-shadow: 0 0 10px #ff1493, 0 0 20px #ff1493;
+            z-index: 10;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+        #nextBtn {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(135deg, #ff1493, #ff69b4);
+            border: 2px solid #ff1493;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px #ff1493, 0 0 40px #ff1493;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        #nextBtn:hover {
+            transform: translateX(-50%) scale(1.1);
+            box-shadow: 0 0 30px #ff1493, 0 0 60px #ff1493;
+        }
+        #nextBtn:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <div id="info">♥ Trái Tim Neon ♥</div>
+    <button id="nextBtn">NEXT ➜</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, particles = [];
+        const particleCount = 2000;
+        let currentShape = 'heart'; // 'heart', 'sunflower', hoặc 'tony'
+        let isTransitioning = false;
+        
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 15;
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            
+            createParticles();
+            
+            // Sự kiện nút Next
+            document.getElementById('nextBtn').addEventListener('click', transitionToNextShape);
+            
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        // Hàm tạo vị trí cho chữ TONY
+        function getTONYPosition(index, total) {
+            const letters = ['T', 'O', 'N', 'Y'];
+            const letterWidth = 3;
+            const letterHeight = 5;
+            const spacing = 1.5;
+            const startX = -6; // Bắt đầu từ bên trái
+            
+            // Phân bổ particles cho 4 chữ cái
+            const particlesPerLetter = total / 4;
+            const letterIndex = Math.floor(index / particlesPerLetter);
+            const letterLocalIndex = index % particlesPerLetter;
+            const letterRatio = letterLocalIndex / particlesPerLetter;
+            
+            let x = 0, y = 0, z = 0;
+            const letterX = startX + letterIndex * (letterWidth + spacing);
+            
+            switch(letters[letterIndex]) {
+                case 'T':
+                    // Chữ T: thanh ngang trên + thanh dọc giữa
+                    if (letterRatio < 0.3) {
+                        // Thanh ngang trên
+                        x = letterX + (letterRatio / 0.3) * letterWidth - letterWidth/2;
+                        y = letterHeight/2;
+                    } else {
+                        // Thanh dọc giữa
+                        x = letterX;
+                        y = letterHeight/2 - ((letterRatio - 0.3) / 0.7) * letterHeight;
+                    }
+                    break;
+                    
+                case 'O':
+                    // Chữ O: hình tròn/oval
+                    const angle = letterRatio * Math.PI * 2;
+                    const radiusX = letterWidth / 2;
+                    const radiusY = letterHeight / 2;
+                    x = letterX + Math.cos(angle) * radiusX;
+                    y = Math.sin(angle) * radiusY;
+                    break;
+                    
+                case 'N':
+                    // Chữ N: 2 thanh dọc + 1 đường chéo
+                    if (letterRatio < 0.25) {
+                        // Thanh dọc trái
+                        x = letterX;
+                        y = letterHeight/2 - (letterRatio / 0.25) * letterHeight;
+                    } else if (letterRatio < 0.75) {
+                        // Đường chéo
+                        const diagRatio = (letterRatio - 0.25) / 0.5;
+                        x = letterX + diagRatio * letterWidth;
+                        y = letterHeight/2 - diagRatio * letterHeight;
+                    } else {
+                        // Thanh dọc phải
+                        x = letterX + letterWidth;
+                        y = letterHeight/2 - ((letterRatio - 0.75) / 0.25) * letterHeight;
+                    }
+                    break;
+                    
+                case 'Y':
+                    // Chữ Y: 2 nhánh trên + 1 thanh dọc dưới
+                    if (letterRatio < 0.4) {
+                        // Nhánh trái trên
+                        const branchRatio = letterRatio / 0.4;
+                        x = letterX + branchRatio * (letterWidth/2);
+                        y = letterHeight/2 - branchRatio * (letterHeight/2);
+                    } else if (letterRatio < 0.8) {
+                        // Nhánh phải trên
+                        const branchRatio = (letterRatio - 0.4) / 0.4;
+                        x = letterX + letterWidth/2 + branchRatio * (letterWidth/2);
+                        y = letterHeight/2 - branchRatio * (letterHeight/2);
+                    } else {
+                        // Thanh dọc dưới
+                        x = letterX + letterWidth/2;
+                        y = -((letterRatio - 0.8) / 0.2) * (letterHeight/2);
+                    }
+                    break;
+            }
+            
+            // Thêm độ sâu z ngẫu nhiên
+            z = (Math.random() - 0.5) * 1.5;
+            
+            return { x, y, z };
+        }
+        
+        function createParticles() {
+            for (let i = 0; i < particleCount; i++) {
+                const geometry = new THREE.SphereGeometry(0.05, 8, 8);
+                const material = new THREE.MeshBasicMaterial({
+                    color: new THREE.Color().setHSL(0.95 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.3),
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const particle = new THREE.Mesh(geometry, material);
+                
+                // Vị trí ngẫu nhiên ban đầu (phân tán rộng)
+                particle.position.x = (Math.random() - 0.5) * 30;
+                particle.position.y = (Math.random() - 0.5) * 30;
+                particle.position.z = (Math.random() - 0.5) * 30;
+                
+                // Tính vị trí đích trên hình trái tim
+                const t = (i / particleCount) * Math.PI * 2;
+                const heartX = 16 * Math.pow(Math.sin(t), 3) * 0.3;
+                const heartY = (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 0.3;
+                const heartZ = (Math.random() - 0.5) * 2;
+                
+                // Tính vị trí đích cho hoa hướng dương
+                const angle = i * Math.PI * 2 / particleCount * 21; // Fibonacci spiral
+                const radius = Math.sqrt(i / particleCount) * 8;
+                const sunflowerX = Math.cos(angle) * radius;
+                const sunflowerY = Math.sin(angle) * radius;
+                const sunflowerZ = (Math.random() - 0.5) * 1.5;
+                
+                // Tính vị trí đích cho chữ TONY
+                const tonyPos = getTONYPosition(i, particleCount);
+                
+                particle.userData = {
+                    heartX: heartX,
+                    heartY: heartY,
+                    heartZ: heartZ,
+                    sunflowerX: sunflowerX,
+                    sunflowerY: sunflowerY,
+                    sunflowerZ: sunflowerZ,
+                    tonyX: tonyPos.x,
+                    tonyY: tonyPos.y,
+                    tonyZ: tonyPos.z,
+                    targetX: heartX,
+                    targetY: heartY,
+                    targetZ: heartZ,
+                    velocityX: 0,
+                    velocityY: 0,
+                    velocityZ: 0,
+                    startTime: Math.random() * 3
+                };
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            // Thêm ánh sáng điểm cho hiệu ứng neon
+            const light1 = new THREE.PointLight(0xff1493, 2, 50);
+            light1.position.set(0, 0, 10);
+            scene.add(light1);
+            
+            const light2 = new THREE.PointLight(0xff69b4, 1.5, 50);
+            light2.position.set(5, 5, 5);
+            scene.add(light2);
+            
+            const light3 = new THREE.PointLight(0xff1493, 1.5, 50);
+            light3.position.set(-5, -5, 5);
+            scene.add(light3);
+        }
+        
+        function transitionToNextShape() {
+            if (isTransitioning) return;
+            
+            isTransitioning = true;
+            const infoDiv = document.getElementById('info');
+            
+            if (currentShape === 'heart') {
+                currentShape = 'sunflower';
+                infoDiv.innerHTML = '🌻 Hoa Hướng Dương 🌻';
+                infoDiv.style.color = '#FFD700';
+                infoDiv.style.textShadow = '0 0 10px #FFD700, 0 0 20px #FFD700';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0xFFD700);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.sunflowerX;
+                    particle.userData.targetY = particle.userData.sunflowerY;
+                    particle.userData.targetZ = particle.userData.sunflowerZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu sang vàng
+                    particle.material.color.setHSL(0.15 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.2);
+                });
+            } else if (currentShape === 'sunflower') {
+                currentShape = 'tony';
+                infoDiv.innerHTML = '✨ TONY ✨';
+                infoDiv.style.color = '#00ffff';
+                infoDiv.style.textShadow = '0 0 10px #00ffff, 0 0 20px #00ffff';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0x00ffff);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.tonyX;
+                    particle.userData.targetY = particle.userData.tonyY;
+                    particle.userData.targetZ = particle.userData.tonyZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu sang cyan/xanh dương
+                    particle.material.color.setHSL(0.5 + Math.random() * 0.1, 1, 0.5 + Math.random() * 0.3);
+                });
+            } else {
+                currentShape = 'heart';
+                infoDiv.innerHTML = '♥ Trái Tim Neon ♥';
+                infoDiv.style.color = '#ff1493';
+                infoDiv.style.textShadow = '0 0 10px #ff1493, 0 0 20px #ff1493';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0xff1493);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.heartX;
+                    particle.userData.targetY = particle.userData.heartY;
+                    particle.userData.targetZ = particle.userData.heartZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu sang hồng
+                    particle.material.color.setHSL(0.95 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.3);
+                });
+            }
+            
+            setTimeout(() => {
+                isTransitioning = false;
+            }, 2000);
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = Date.now() * 0.001;
+            
+            particles.forEach((particle, i) => {
+                if (time > particle.userData.startTime) {
+                    // Tính lực hút về vị trí đích (vật lý đơn giản)
+                    const dx = particle.userData.targetX - particle.position.x;
+                    const dy = particle.userData.targetY - particle.position.y;
+                    const dz = particle.userData.targetZ - particle.position.z;
+                    
+                    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    // Lực hút với damping (chậm hơn, như drone)
+                    const force = 0.005;
+                    const damping = 0.92;
+                    
+                    particle.userData.velocityX += dx * force;
+                    particle.userData.velocityY += dy * force;
+                    particle.userData.velocityZ += dz * force;
+                    
+                    // Giới hạn tốc độ tối đa (như drone)
+                    const maxSpeed = 0.05;
+                    const speed = Math.sqrt(
+                        particle.userData.velocityX ** 2 + 
+                        particle.userData.velocityY ** 2 + 
+                        particle.userData.velocityZ ** 2
+                    );
+                    if (speed > maxSpeed) {
+                        particle.userData.velocityX = (particle.userData.velocityX / speed) * maxSpeed;
+                        particle.userData.velocityY = (particle.userData.velocityY / speed) * maxSpeed;
+                        particle.userData.velocityZ = (particle.userData.velocityZ / speed) * maxSpeed;
+                    }
+                    
+                    particle.userData.velocityX *= damping;
+                    particle.userData.velocityY *= damping;
+                    particle.userData.velocityZ *= damping;
+                    
+                    particle.position.x += particle.userData.velocityX;
+                    particle.position.y += particle.userData.velocityY;
+                    particle.position.z += particle.userData.velocityZ;
+                    
+                    // Dao động nhẹ khi đã đến vị trí
+                    if (distance < 0.5) {
+                        particle.position.y += Math.sin(time * 2 + i * 0.1) * 0.01;
+                    }
+                }
+                
+                // Hiệu ứng sáng lấp lánh
+                particle.material.opacity = 0.6 + Math.sin(time * 3 + i * 0.5) * 0.2;
+            });
+            
+            // Xoay nhẹ toàn bộ scene
+            scene.rotation.y = Math.sin(time * 0.2) * 0.2;
+            scene.rotation.x = Math.sin(time * 0.15) * 0.1;
+            
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        init();
+        animate();
+    </script>
+</body>
+</html>
