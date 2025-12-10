@@ -1,12 +1,6 @@
-// Xử lý sự kiện Mouse và Window Resize
+// Xử lý sự kiện Window Resize
 function setupEvents() {
-    document.addEventListener('mousemove', onMouseMove, false);
     window.addEventListener('resize', onWindowResize, false);
-}
-
-function onMouseMove(event) {
-    App.mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-    App.mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
 }
 
 function onWindowResize() {

@@ -13,7 +13,7 @@ function switchFormation() {
         
         // Cập nhật text sau khi transition xong
         setTimeout(() => {
-            updateInfo('🌻 Hoa Hướng Dương 3D - Kéo chuột để xoay');
+            updateInfo('🌻 Hoa Hướng Dương 3D');
         }, App.particleSystem.transitionDuration * 1000);
     } else {
         // Chuyển về sứa
@@ -23,7 +23,7 @@ function switchFormation() {
         
         // Cập nhật text sau khi transition xong
         setTimeout(() => {
-            updateInfo('🌊 Sứa Neon 3D - Kéo chuột để xoay');
+            updateInfo('🌊 Sứa Neon 3D');
         }, App.particleSystem.transitionDuration * 1000);
     }
 }

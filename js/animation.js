@@ -12,10 +12,9 @@ function animate() {
     // Cập nhật transition nếu đang chuyển đổi
     if (App.particleSystem && App.particleSystem.isTransitioning) {
         updateParticleTransition(deltaTime);
-        // Vẫn cho phép xoay group khi transition
+        // Tự xoay chậm khi transition
         const particleGroup = App.particleSystem.particleGroup;
-        particleGroup.rotation.x = App.mouseY * 0.2;
-        particleGroup.rotation.y += App.mouseX * 0.005 + 0.001;
+        particleGroup.rotation.y += 0.001;
     } else {
         // Animation bình thường khi không transition
         animateParticles();
@@ -53,11 +52,8 @@ function animateParticles() {
         
         // Floating motion cho toàn bộ group
         particleGroup.position.y = Math.sin(App.time * 0.8) * 1;
+        // Tự xoay chậm
         particleGroup.rotation.y += 0.002;
-        
-        // Mouse interaction
-        particleGroup.rotation.x = App.mouseY * 0.3;
-        particleGroup.rotation.y += App.mouseX * 0.01;
         
     } else if (App.currentFormation === 'sunflower') {
         particles.forEach(particle => {
@@ -78,11 +74,8 @@ function animateParticles() {
         
         // Floating motion cho toàn bộ group
         particleGroup.position.y = Math.sin(App.time * 0.6) * 0.8;
+        // Tự xoay chậm
         particleGroup.rotation.y += 0.003;
-        
-        // Mouse interaction
-        particleGroup.rotation.x = App.mouseY * 0.2;
-        particleGroup.rotation.y += App.mouseX * 0.01;
     }
 }
 
