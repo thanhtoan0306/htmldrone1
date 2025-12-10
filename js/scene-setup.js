@@ -22,3 +22,4 @@ function initScene() {
     pointLight.position.set(0, 10, 10);
     App.scene.add(pointLight);
 }
+

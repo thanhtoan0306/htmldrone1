@@ -119,3 +119,4 @@ function createTentacle(angle) {
     
     return tentacle;
 }
+

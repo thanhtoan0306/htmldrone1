@@ -23,3 +23,4 @@ function createOceanParticles() {
     const particles = new THREE.Points(geometry, material);
     App.scene.add(particles);
 }
+

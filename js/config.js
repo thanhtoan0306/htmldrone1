@@ -13,3 +13,4 @@ const App = {
     mouseY: 0,
     lastFrameTime: 0
 };
+

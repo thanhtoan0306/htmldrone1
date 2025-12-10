@@ -149,3 +149,4 @@ function showInputPanel() {
         nextButton.classList.remove('visible');
     }
 }
+

@@ -751,3 +751,4 @@ function updateParticleTransition(deltaTime) {
         particle.children[0].material.color.lerpColors(startColor, targetColor, eased);
     });
 }
+

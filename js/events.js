@@ -8,3 +8,4 @@ function onWindowResize() {
     App.camera.updateProjectionMatrix();
     App.renderer.setSize(window.innerWidth, window.innerHeight);
 }
+
