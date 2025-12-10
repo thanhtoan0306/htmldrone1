@@ -93,15 +93,20 @@
                 const lines = text.trim().split(/\r?\n/);
                 
                 // Parse CSV: Drone_ID,Name,Time(s),Frame,X,Y,Z
+                // Swap Y và Z để dựng Z lên 90 độ (Z trong CSV là chiều cao, cần chuyển thành Y trong Three.js)
                 csvCoordinates = lines
                     .slice(1) // Bỏ header
                     .map((line) => {
                         const parts = line.split(',');
                         if (parts.length >= 7) {
+                            const csvX = parseFloat(parts[4]);
+                            const csvY = parseFloat(parts[5]);
+                            const csvZ = parseFloat(parts[6]);
+                            // Swap: X giữ nguyên, Y (CSV) -> Z (Three.js), Z (CSV) -> Y (Three.js)
                             return {
-                                x: parseFloat(parts[4]),
-                                y: parseFloat(parts[5]),
-                                z: parseFloat(parts[6])
+                                x: csvX,
+                                y: csvZ,  // Z trong CSV trở thành Y (chiều cao) trong Three.js
+                                z: csvY   // Y trong CSV trở thành Z (depth) trong Three.js
                             };
                         }
                         return null;
