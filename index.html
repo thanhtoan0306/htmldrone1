@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sứa Neon 3D</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000000;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #ff0080;
+            font-size: 14px;
+            text-shadow: 0 0 10px #ff0080;
+            z-index: 100;
+        }
+        .next-button {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #ff0080, #9d00ff);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 0, 128, 0.4);
+            transition: all 0.3s ease;
+            z-index: 100;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .next-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 0, 128, 0.6);
+            background: linear-gradient(135deg, #ff3366, #b300ff);
+        }
+        .next-button:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        🌊 Sứa Neon 3D - Kéo chuột để xoay
+    </div>
+    <button class="next-button" onclick="switchFormation()">NEXT</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/scene-setup.js"></script>
+    <script src="js/particle-system.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/events.js"></script>
+    <script src="js/animation.js"></script>
+    <script src="js/controller.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
