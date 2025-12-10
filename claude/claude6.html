@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trái Tim Neon 3D</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0015 0%, #1a0033 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff1493;
+            text-align: center;
+            font-size: 24px;
+            text-shadow: 0 0 10px #ff1493, 0 0 20px #ff1493;
+            z-index: 10;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+        #nextBtn {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(135deg, #ff1493, #ff69b4);
+            border: 2px solid #ff1493;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px #ff1493, 0 0 40px #ff1493;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        #nextBtn:hover {
+            transform: translateX(-50%) scale(1.1);
+            box-shadow: 0 0 30px #ff1493, 0 0 60px #ff1493;
+        }
+        #nextBtn:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <div id="info">♥ Trái Tim Neon ♥</div>
+    <button id="nextBtn">NEXT ➜</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, particles = [];
+        const particleCount = 2000;
+        let currentShape = 'heart'; // 'heart', 'sunflower', 'dna', 'tony', 'orbit', 'formation'
+        let isTransitioning = false;
+        let csvCoordinates = []; // Lưu tọa độ từ CSV
+        
+        async function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 15;
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            
+            await loadCSVCoordinates();
+            createParticles();
+            
+            // Sự kiện nút Next
+            document.getElementById('nextBtn').addEventListener('click', transitionToNextShape);
+            
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        async function loadCSVCoordinates() {
+            try {
+                const res = await fetch('../3dblenderthree/file5.csv');
+                if (!res.ok) throw new Error('Không đọc được file CSV');
+                const text = await res.text();
+                const lines = text.trim().split(/\r?\n/);
+                
+                // Parse CSV: Drone_ID,Name,Time(s),Frame,X,Y,Z
+                csvCoordinates = lines
+                    .slice(1) // Bỏ header
+                    .map((line) => {
+                        const parts = line.split(',');
+                        if (parts.length >= 7) {
+                            return {
+                                x: parseFloat(parts[4]),
+                                y: parseFloat(parts[5]),
+                                z: parseFloat(parts[6])
+                            };
+                        }
+                        return null;
+                    })
+                    .filter(p => p !== null && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z));
+                
+                // Tính center và scale để fit vào scene
+                if (csvCoordinates.length > 0) {
+                    const xs = csvCoordinates.map(p => p.x);
+                    const ys = csvCoordinates.map(p => p.y);
+                    const zs = csvCoordinates.map(p => p.z);
+                    
+                    const centerX = (Math.max(...xs) + Math.min(...xs)) / 2;
+                    const centerY = (Math.max(...ys) + Math.min(...ys)) / 2;
+                    const centerZ = (Math.max(...zs) + Math.min(...zs)) / 2;
+                    
+                    const rangeX = Math.max(...xs) - Math.min(...xs);
+                    const rangeY = Math.max(...ys) - Math.min(...ys);
+                    const rangeZ = Math.max(...zs) - Math.min(...zs);
+                    const maxRange = Math.max(rangeX, rangeY, rangeZ);
+                    
+                    // Scale để fit vào scene (khoảng -10 đến 10)
+                    const scale = 20 / maxRange;
+                    
+                    // Normalize tọa độ
+                    csvCoordinates = csvCoordinates.map(p => ({
+                        x: (p.x - centerX) * scale,
+                        y: (p.y - centerY) * scale,
+                        z: (p.z - centerZ) * scale
+                    }));
+                    
+                    console.log(`Loaded ${csvCoordinates.length} coordinates from CSV`);
+                }
+            } catch (err) {
+                console.error('Error loading CSV:', err);
+                // Tạo tọa độ mặc định nếu không load được
+                csvCoordinates = [];
+            }
+        }
+        
+        function getTextPoints(text, numPoints) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 800;
+            canvas.height = 200;
+            
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 150px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixels = imageData.data;
+            const points = [];
+            
+            for (let y = 0; y < canvas.height; y += 2) {
+                for (let x = 0; x < canvas.width; x += 2) {
+                    const i = (y * canvas.width + x) * 4;
+                    if (pixels[i] > 128) {
+                        points.push({
+                            x: (x - canvas.width / 2) / 40,
+                            y: -(y - canvas.height / 2) / 40,
+                            z: (Math.random() - 0.5) * 2
+                        });
+                    }
+                }
+            }
+            
+            // Lấy mẫu random nếu có quá nhiều điểm
+            while (points.length > numPoints) {
+                points.splice(Math.floor(Math.random() * points.length), 1);
+            }
+            
+            // Thêm điểm random nếu thiếu
+            while (points.length < numPoints) {
+                const randomPoint = points[Math.floor(Math.random() * points.length)];
+                points.push({
+                    x: randomPoint.x + (Math.random() - 0.5) * 0.5,
+                    y: randomPoint.y + (Math.random() - 0.5) * 0.5,
+                    z: randomPoint.z + (Math.random() - 0.5) * 0.5
+                });
+            }
+            
+            return points;
+        }
+        
+        function createParticles() {
+            // Tạo điểm cho chữ TONY
+            const tonyPoints = getTextPoints('TONY', particleCount);
+            
+            for (let i = 0; i < particleCount; i++) {
+                const geometry = new THREE.SphereGeometry(0.05, 8, 8);
+                const material = new THREE.MeshBasicMaterial({
+                    color: new THREE.Color().setHSL(0.95 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.3),
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const particle = new THREE.Mesh(geometry, material);
+                
+                // Vị trí ngẫu nhiên ban đầu (phân tán rộng)
+                particle.position.x = (Math.random() - 0.5) * 30;
+                particle.position.y = (Math.random() - 0.5) * 30;
+                particle.position.z = (Math.random() - 0.5) * 30;
+                
+                // Tính vị trí đích trên hình trái tim
+                const t = (i / particleCount) * Math.PI * 2;
+                const heartX = 16 * Math.pow(Math.sin(t), 3) * 0.3;
+                const heartY = (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 0.3;
+                const heartZ = (Math.random() - 0.5) * 2;
+                
+                // Tính vị trí đích cho hoa hướng dương
+                const angle = i * Math.PI * 2 / particleCount * 21; // Fibonacci spiral
+                const radius = Math.sqrt(i / particleCount) * 8;
+                const sunflowerX = Math.cos(angle) * radius;
+                const sunflowerY = Math.sin(angle) * radius;
+                const sunflowerZ = (Math.random() - 0.5) * 1.5;
+                
+                // Tính vị trí đích cho DNA xoắn kép
+                const dnaT = (i / particleCount) * Math.PI * 8; // 4 vòng xoắn
+                const dnaRadius = 2.5;
+                const dnaHeight = 12;
+                const strand = i % 2; // 2 chuỗi DNA
+                const dnaAngle = dnaT + (strand * Math.PI);
+                const dnaX = Math.cos(dnaAngle) * dnaRadius;
+                const dnaZ = Math.sin(dnaAngle) * dnaRadius;
+                const dnaY = (i / particleCount) * dnaHeight - dnaHeight / 2;
+                
+                // Vị trí cho chữ TONY
+                const tonyPoint = tonyPoints[i];
+                const tonyX = tonyPoint.x;
+                const tonyY = tonyPoint.y;
+                const tonyZ = tonyPoint.z;
+                
+                // Vị trí cho quỹ đạo Trái Đất - Mặt Trăng
+                let orbitX, orbitY, orbitZ;
+                if (i < 800) {
+                    // Trái Đất (800 hạt)
+                    const earthPhi = Math.acos(2 * (i / 800) - 1);
+                    const earthTheta = Math.PI * (1 + Math.sqrt(5)) * i;
+                    const earthRadius = 2;
+                    orbitX = earthRadius * Math.sin(earthPhi) * Math.cos(earthTheta);
+                    orbitY = earthRadius * Math.sin(earthPhi) * Math.sin(earthTheta);
+                    orbitZ = earthRadius * Math.cos(earthPhi);
+                } else if (i < 1000) {
+                    // Mặt Trăng (200 hạt)
+                    const moonIndex = i - 800;
+                    const moonPhi = Math.acos(2 * (moonIndex / 200) - 1);
+                    const moonTheta = Math.PI * (1 + Math.sqrt(5)) * moonIndex;
+                    const moonRadius = 0.7;
+                    const orbitDistance = 6;
+                    orbitX = orbitDistance + moonRadius * Math.sin(moonPhi) * Math.cos(moonTheta);
+                    orbitY = moonRadius * Math.sin(moonPhi) * Math.sin(moonTheta);
+                    orbitZ = moonRadius * Math.cos(moonPhi);
+                } else {
+                    // Quỹ đạo (1000 hạt)
+                    const orbitIndex = i - 1000;
+                    const orbitAngle = (orbitIndex / 1000) * Math.PI * 2;
+                    const orbitDistance = 6;
+                    orbitX = Math.cos(orbitAngle) * orbitDistance;
+                    orbitY = Math.sin(orbitAngle) * orbitDistance;
+                    orbitZ = (Math.random() - 0.5) * 0.3;
+                }
+                
+                // Vị trí cho đội hình từ CSV
+                let formationX, formationY, formationZ;
+                if (csvCoordinates && csvCoordinates.length > 0) {
+                    // Map particles vào CSV coordinates (lặp lại nếu cần)
+                    const csvIndex = i % csvCoordinates.length;
+                    formationX = csvCoordinates[csvIndex].x;
+                    formationY = csvCoordinates[csvIndex].y;
+                    formationZ = csvCoordinates[csvIndex].z;
+                } else {
+                    // Fallback nếu không có CSV
+                    formationX = (Math.random() - 0.5) * 10;
+                    formationY = (Math.random() - 0.5) * 10;
+                    formationZ = (Math.random() - 0.5) * 10;
+                }
+                
+                particle.userData = {
+                    heartX: heartX,
+                    heartY: heartY,
+                    heartZ: heartZ,
+                    sunflowerX: sunflowerX,
+                    sunflowerY: sunflowerY,
+                    sunflowerZ: sunflowerZ,
+                    dnaX: dnaX,
+                    dnaY: dnaY,
+                    dnaZ: dnaZ,
+                    tonyX: tonyX,
+                    tonyY: tonyY,
+                    tonyZ: tonyZ,
+                    orbitX: orbitX,
+                    orbitY: orbitY,
+                    orbitZ: orbitZ,
+                    formationX: formationX,
+                    formationY: formationY,
+                    formationZ: formationZ,
+                    orbitIndex: i,
+                    targetX: heartX,
+                    targetY: heartY,
+                    targetZ: heartZ,
+                    velocityX: 0,
+                    velocityY: 0,
+                    velocityZ: 0,
+                    startTime: Math.random() * 3
+                };
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            // Thêm ánh sáng điểm cho hiệu ứng neon
+            const light1 = new THREE.PointLight(0xff1493, 2, 50);
+            light1.position.set(0, 0, 10);
+            scene.add(light1);
+            
+            const light2 = new THREE.PointLight(0xff69b4, 1.5, 50);
+            light2.position.set(5, 5, 5);
+            scene.add(light2);
+            
+            const light3 = new THREE.PointLight(0xff1493, 1.5, 50);
+            light3.position.set(-5, -5, 5);
+            scene.add(light3);
+        }
+        
+        function transitionToNextShape() {
+            if (isTransitioning) return;
+            
+            isTransitioning = true;
+            const infoDiv = document.getElementById('info');
+            
+            if (currentShape === 'heart') {
+                currentShape = 'sunflower';
+                infoDiv.innerHTML = '🌻 Hoa Hướng Dương 🌻';
+                infoDiv.style.color = '#FFD700';
+                infoDiv.style.textShadow = '0 0 10px #FFD700, 0 0 20px #FFD700';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0xFFD700);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.sunflowerX;
+                    particle.userData.targetY = particle.userData.sunflowerY;
+                    particle.userData.targetZ = particle.userData.sunflowerZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu sang vàng
+                    particle.material.color.setHSL(0.15 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.2);
+                });
+            } else if (currentShape === 'sunflower') {
+                currentShape = 'dna';
+                infoDiv.innerHTML = '🧬 DNA Xoắn Kép 🧬';
+                infoDiv.style.color = '#00FFFF';
+                infoDiv.style.textShadow = '0 0 10px #00FFFF, 0 0 20px #00FFFF';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0x00FFFF);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.dnaX;
+                    particle.userData.targetY = particle.userData.dnaY;
+                    particle.userData.targetZ = particle.userData.dnaZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu sang cyan/xanh lam
+                    const strand = i % 2;
+                    if (strand === 0) {
+                        particle.material.color.setHex(0x00FFFF); // Cyan
+                    } else {
+                        particle.material.color.setHex(0x0080FF); // Xanh dương
+                    }
+                });
+            } else if (currentShape === 'dna') {
+                currentShape = 'tony';
+                infoDiv.innerHTML = '✨ TONY ✨';
+                infoDiv.style.color = '#FF00FF';
+                infoDiv.style.textShadow = '0 0 10px #FF00FF, 0 0 20px #FF00FF';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0xFF00FF);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.tonyX;
+                    particle.userData.targetY = particle.userData.tonyY;
+                    particle.userData.targetZ = particle.userData.tonyZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu sang tím/magenta
+                    particle.material.color.setHSL(0.83 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.2);
+                });
+            } else if (currentShape === 'tony') {
+                currentShape = 'orbit';
+                infoDiv.innerHTML = '🌍 Trái Đất & Mặt Trăng 🌙';
+                infoDiv.style.color = '#4169E1';
+                infoDiv.style.textShadow = '0 0 10px #4169E1, 0 0 20px #4169E1';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0x4169E1);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.orbitX;
+                    particle.userData.targetY = particle.userData.orbitY;
+                    particle.userData.targetZ = particle.userData.orbitZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu theo vị trí
+                    if (i < 800) {
+                        // Trái Đất - xanh lam/xanh lục
+                        particle.material.color.setHex(0x1E90FF);
+                    } else if (i < 1000) {
+                        // Mặt Trăng - xám trắng
+                        particle.material.color.setHex(0xC0C0C0);
+                    } else {
+                        // Quỹ đạo - xanh nhạt
+                        particle.material.color.setHex(0x87CEEB);
+                    }
+                });
+            } else if (currentShape === 'orbit') {
+                currentShape = 'formation';
+                infoDiv.innerHTML = '🚁 Đội Hình Drone 🚁';
+                infoDiv.style.color = '#00FF00';
+                infoDiv.style.textShadow = '0 0 10px #00FF00, 0 0 20px #00FF00';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0x00FF00);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.formationX;
+                    particle.userData.targetY = particle.userData.formationY;
+                    particle.userData.targetZ = particle.userData.formationZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu sang xanh lá
+                    particle.material.color.setHSL(0.33 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.2);
+                });
+            } else {
+                currentShape = 'heart';
+                infoDiv.innerHTML = '♥ Trái Tim Neon ♥';
+                infoDiv.style.color = '#ff1493';
+                infoDiv.style.textShadow = '0 0 10px #ff1493, 0 0 20px #ff1493';
+                
+                // Cập nhật màu ánh sáng
+                scene.children.forEach(child => {
+                    if (child instanceof THREE.PointLight) {
+                        child.color.setHex(0xff1493);
+                    }
+                });
+                
+                // Cập nhật target và màu sắc particles
+                particles.forEach((particle, i) => {
+                    particle.userData.targetX = particle.userData.heartX;
+                    particle.userData.targetY = particle.userData.heartY;
+                    particle.userData.targetZ = particle.userData.heartZ;
+                    particle.userData.startTime = Date.now() * 0.001 + Math.random() * 2;
+                    
+                    // Đổi màu sang hồng
+                    particle.material.color.setHSL(0.95 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.3);
+                });
+            }
+            
+            setTimeout(() => {
+                isTransitioning = false;
+            }, 2000);
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = Date.now() * 0.001;
+            
+            particles.forEach((particle, i) => {
+                if (time > particle.userData.startTime) {
+                    // Nếu đang ở chế độ orbit, cập nhật vị trí động
+                    if (currentShape === 'orbit') {
+                        const orbitIndex = particle.userData.orbitIndex;
+                        if (orbitIndex >= 800 && orbitIndex < 1000) {
+                            // Mặt Trăng quay quanh Trái Đất
+                            const moonIndex = orbitIndex - 800;
+                            const moonPhi = Math.acos(2 * (moonIndex / 200) - 1);
+                            const moonTheta = Math.PI * (1 + Math.sqrt(5)) * moonIndex;
+                            const moonRadius = 0.7;
+                            const orbitDistance = 6;
+                            const orbitAngle = time * 0.5; // Tốc độ quay
+                            particle.userData.targetX = Math.cos(orbitAngle) * orbitDistance + moonRadius * Math.sin(moonPhi) * Math.cos(moonTheta);
+                            particle.userData.targetY = Math.sin(orbitAngle) * orbitDistance + moonRadius * Math.sin(moonPhi) * Math.sin(moonTheta);
+                            particle.userData.targetZ = moonRadius * Math.cos(moonPhi);
+                        }
+                    }
+                    
+                    // Tính lực hút về vị trí đích (vật lý đơn giản)
+                    const dx = particle.userData.targetX - particle.position.x;
+                    const dy = particle.userData.targetY - particle.position.y;
+                    const dz = particle.userData.targetZ - particle.position.z;
+                    
+                    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    // Lực hút với damping (chậm hơn, như drone)
+                    const force = 0.005;
+                    const damping = 0.92;
+                    
+                    particle.userData.velocityX += dx * force;
+                    particle.userData.velocityY += dy * force;
+                    particle.userData.velocityZ += dz * force;
+                    
+                    // Giới hạn tốc độ tối đa (như drone)
+                    const maxSpeed = 0.05;
+                    const speed = Math.sqrt(
+                        particle.userData.velocityX ** 2 + 
+                        particle.userData.velocityY ** 2 + 
+                        particle.userData.velocityZ ** 2
+                    );
+                    if (speed > maxSpeed) {
+                        particle.userData.velocityX = (particle.userData.velocityX / speed) * maxSpeed;
+                        particle.userData.velocityY = (particle.userData.velocityY / speed) * maxSpeed;
+                        particle.userData.velocityZ = (particle.userData.velocityZ / speed) * maxSpeed;
+                    }
+                    
+                    particle.userData.velocityX *= damping;
+                    particle.userData.velocityY *= damping;
+                    particle.userData.velocityZ *= damping;
+                    
+                    particle.position.x += particle.userData.velocityX;
+                    particle.position.y += particle.userData.velocityY;
+                    particle.position.z += particle.userData.velocityZ;
+                    
+                    // Dao động nhẹ khi đã đến vị trí
+                    if (distance < 0.5) {
+                        particle.position.y += Math.sin(time * 2 + i * 0.1) * 0.01;
+                    }
+                }
+                
+                // Hiệu ứng sáng lấp lánh
+                particle.material.opacity = 0.6 + Math.sin(time * 3 + i * 0.5) * 0.2;
+            });
+            
+            // Xoay nhẹ toàn bộ scene
+            scene.rotation.y = Math.sin(time * 0.2) * 0.2;
+            scene.rotation.x = Math.sin(time * 0.15) * 0.1;
+            
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        init();
+        animate();
+    </script>
+</body>
+</html>
