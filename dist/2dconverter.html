@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chuyển đổi ảnh sang ma trận 50x50</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 1200px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .preview-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .preview-box {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+        
+        .preview-box h3 {
+            color: #555;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        #originalCanvas, #matrixCanvas {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: white;
+        }
+        
+        .export-section {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .export-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+        }
+        
+        .export-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            color: #1565c0;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .preview-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ Chuyển đổi ảnh 2D sang ma trận 50x50</h1>
+        
+        <div class="info">
+            📌 Tải lên ảnh của bạn để chuyển đổi thành ma trận 50x50 pixel và xuất tọa độ JSON
+        </div>
+        
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="imageInput" accept="image/*">
+                <button class="upload-btn" onclick="document.getElementById('imageInput').click()">
+                    📁 Chọn ảnh
+                </button>
+            </div>
+        </div>
+        
+        <div class="preview-section">
+            <div class="preview-box">
+                <h3>Ảnh gốc</h3>
+                <canvas id="originalCanvas"></canvas>
+            </div>
+            <div class="preview-box">
+                <h3>Ma trận 50x50</h3>
+                <canvas id="matrixCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="export-section">
+            <button class="export-btn" id="exportBtn" disabled onclick="exportJSON()">
+                💾 Xuất JSON tọa độ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let matrixData = null;
+        
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    processImage(img);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        function processImage(img) {
+            // Hiển thị ảnh gốc
+            const originalCanvas = document.getElementById('originalCanvas');
+            const originalCtx = originalCanvas.getContext('2d');
+            
+            const maxSize = 400;
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > height) {
+                if (width > maxSize) {
+                    height *= maxSize / width;
+                    width = maxSize;
+                }
+            } else {
+                if (height > maxSize) {
+                    width *= maxSize / height;
+                    height = maxSize;
+                }
+            }
+            
+            originalCanvas.width = width;
+            originalCanvas.height = height;
+            originalCtx.drawImage(img, 0, 0, width, height);
+            
+            // Tạo ma trận 50x50
+            const matrixSize = 50;
+            const matrixCanvas = document.getElementById('matrixCanvas');
+            const matrixCtx = matrixCanvas.getContext('2d');
+            
+            matrixCanvas.width = matrixSize;
+            matrixCanvas.height = matrixSize;
+            matrixCtx.drawImage(img, 0, 0, matrixSize, matrixSize);
+            
+            // Lấy dữ liệu pixel
+            const imageData = matrixCtx.getImageData(0, 0, matrixSize, matrixSize);
+            const pixels = imageData.data;
+            
+            // Tạo ma trận với tọa độ và màu sắc
+            matrixData = [];
+            for (let y = 0; y < matrixSize; y++) {
+                for (let x = 0; x < matrixSize; x++) {
+                    const index = (y * matrixSize + x) * 4;
+                    const r = pixels[index];
+                    const g = pixels[index + 1];
+                    const b = pixels[index + 2];
+                    const a = pixels[index + 3];
+                    
+                    matrixData.push({
+                        x: x,
+                        y: y,
+                        color: {
+                            r: r,
+                            g: g,
+                            b: b,
+                            a: a
+                        },
+                        hex: rgbToHex(r, g, b)
+                    });
+                }
+            }
+            
+            // Vẽ lại ma trận với các dot tròn nghệ thuật
+            const displaySize = 500;
+            const dotSpacing = displaySize / matrixSize;
+            const maxDotSize = dotSpacing * 0.8;
+            
+            matrixCanvas.width = displaySize;
+            matrixCanvas.height = displaySize;
+            matrixCtx.fillStyle = '#1a1a1a';
+            matrixCtx.fillRect(0, 0, displaySize, displaySize);
+            
+            // Vẽ từng dot tròn
+            for (let i = 0; i < matrixData.length; i++) {
+                const pixel = matrixData[i];
+                const x = pixel.x * dotSpacing + dotSpacing / 2;
+                const y = pixel.y * dotSpacing + dotSpacing / 2;
+                
+                // Tính độ sáng để quyết định kích thước dot
+                const brightness = (pixel.color.r + pixel.color.g + pixel.color.b) / 3;
+                const dotSize = (brightness / 255) * maxDotSize;
+                
+                matrixCtx.beginPath();
+                matrixCtx.arc(x, y, dotSize / 2, 0, Math.PI * 2);
+                matrixCtx.fillStyle = pixel.hex;
+                matrixCtx.fill();
+            }
+            
+            // Kích hoạt nút xuất
+            document.getElementById('exportBtn').disabled = false;
+        }
+        
+        function rgbToHex(r, g, b) {
+            return "#" + [r, g, b].map(x => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? "0" + hex : hex;
+            }).join('');
+        }
+        
+        function exportJSON() {
+            if (!matrixData) {
+                alert('Vui lòng tải ảnh lên trước!');
+                return;
+            }
+            
+            const jsonData = {
+                metadata: {
+                    size: 50,
+                    totalPixels: 2500,
+                    exportDate: new Date().toISOString()
+                },
+                pixels: matrixData
+            };
+            
+            const dataStr = JSON.stringify(jsonData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'matrix_50x50_' + Date.now() + '.json';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            alert('✅ Đã xuất file JSON thành công!');
+        }
+    </script>
+</body>
+</html>

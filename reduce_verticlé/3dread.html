@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đội Hình 3D từ JSON</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0015 0%, #1a0033 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00FFFF;
+            text-align: center;
+            font-size: 24px;
+            text-shadow: 0 0 10px #00FFFF, 0 0 20px #00FFFF;
+            z-index: 10;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+        #fileInputContainer {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        #fileInput {
+            padding: 10px 20px;
+            font-size: 14px;
+            color: #fff;
+            background: linear-gradient(135deg, #00FF00, #32CD32);
+            border: 2px solid #00FF00;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 0 15px #00FF00;
+            transition: all 0.3s ease;
+        }
+        #fileInput:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px #00FF00;
+        }
+        #fileInput input[type="file"] {
+            display: none;
+        }
+        #fileInputLabel {
+            cursor: pointer;
+            display: block;
+        }
+        #stats {
+            position: absolute;
+            top: 130px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 20px;
+            border-radius: 15px;
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+        #controlsHint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            font-size: 12px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 16px;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">🚁 Đội Hình 3D từ JSON 🚁</div>
+    <div id="fileInputContainer">
+        <label id="fileInputLabel" for="jsonFile">📁 Chọn file JSON tọa độ</label>
+        <input type="file" id="jsonFile" accept=".json" />
+    </div>
+    <div id="stats"></div>
+    <div id="controlsHint">🖱️ Kéo chuột để xoay | Scroll để zoom | Giữ chuột giữa để pan</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        let scene, camera, renderer, particles = [];
+        let controls;
+        let jsonCoordinates = [];
+        const particleCount = 2000; // Số particles tối đa
+        
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 15;
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            
+            // Khởi tạo OrbitControls
+            if (typeof THREE.OrbitControls !== 'undefined') {
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.enableZoom = true;
+                controls.enablePan = true;
+                controls.minDistance = 5;
+                controls.maxDistance = 50;
+            }
+            
+            // Thêm ánh sáng
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            const light1 = new THREE.PointLight(0x00FFFF, 2, 50);
+            light1.position.set(0, 0, 10);
+            scene.add(light1);
+            
+            const light2 = new THREE.PointLight(0x00FFFF, 1.5, 50);
+            light2.position.set(5, 5, 5);
+            scene.add(light2);
+            
+            const light3 = new THREE.PointLight(0x00FFFF, 1.5, 50);
+            light3.position.set(-5, -5, 5);
+            scene.add(light3);
+            
+            // Event listeners
+            document.getElementById('jsonFile').addEventListener('change', handleFileSelect);
+            
+            window.addEventListener('resize', onWindowResize);
+            
+            // Start animation
+            animate();
+        }
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    parseJSONData(jsonData);
+                } catch (error) {
+                    console.error('Error parsing JSON:', error);
+                    alert('Lỗi khi parse file JSON: ' + error.message);
+                }
+            };
+            reader.onerror = function() {
+                alert('Lỗi khi đọc file!');
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseJSONData(jsonData) {
+            // Kiểm tra cấu trúc JSON
+            if (!jsonData.vertices || !Array.isArray(jsonData.vertices)) {
+                alert('File JSON không hợp lệ! Cần có mảng "vertices".');
+                return;
+            }
+            
+            const vertices = jsonData.vertices;
+            const totalVertices = jsonData.metadata?.totalVertices || vertices.length;
+            
+            console.log(`Loaded ${vertices.length} vertices from JSON`);
+            
+            // Parse tọa độ
+            jsonCoordinates = vertices.map(v => ({
+                x: parseFloat(v.x) || 0,
+                y: parseFloat(v.y) || 0,
+                z: parseFloat(v.z) || 0
+            })).filter(v => 
+                Number.isFinite(v.x) && 
+                Number.isFinite(v.y) && 
+                Number.isFinite(v.z)
+            );
+            
+            if (jsonCoordinates.length === 0) {
+                alert('Không tìm thấy tọa độ hợp lệ trong file JSON!');
+                return;
+            }
+            
+            // Normalize tọa độ để fit vào scene
+            normalizeCoordinates();
+            
+            // Hiển thị thông tin
+            updateStats(jsonCoordinates.length, totalVertices);
+            
+            // Tạo particles
+            createParticlesFromCoordinates();
+            
+            // Cập nhật info
+            const infoDiv = document.getElementById('info');
+            infoDiv.innerHTML = `🦋 Đội Hình ${jsonCoordinates.length} Điểm 🦋`;
+            infoDiv.style.color = '#00FFFF';
+        }
+        
+        function normalizeCoordinates() {
+            if (jsonCoordinates.length === 0) return;
+            
+            // Tính center và scale
+            const xs = jsonCoordinates.map(v => v.x);
+            const ys = jsonCoordinates.map(v => v.y);
+            const zs = jsonCoordinates.map(v => v.z);
+            
+            const centerX = (Math.max(...xs) + Math.min(...xs)) / 2;
+            const centerY = (Math.max(...ys) + Math.min(...ys)) / 2;
+            const centerZ = (Math.max(...zs) + Math.min(...zs)) / 2;
+            
+            const rangeX = Math.max(...xs) - Math.min(...xs);
+            const rangeY = Math.max(...ys) - Math.min(...ys);
+            const rangeZ = Math.max(...zs) - Math.min(...zs);
+            const maxRange = Math.max(rangeX, rangeY, rangeZ);
+            
+            // Scale để fit vào scene (khoảng -10 đến 10)
+            const scale = maxRange > 0 ? 20 / maxRange : 1;
+            
+            // Normalize tọa độ
+            jsonCoordinates = jsonCoordinates.map(v => ({
+                x: (v.x - centerX) * scale,
+                y: (v.y - centerY) * scale,
+                z: (v.z - centerZ) * scale
+            }));
+        }
+        
+        function updateStats(loadedCount, totalCount) {
+            const statsDiv = document.getElementById('stats');
+            statsDiv.innerHTML = `
+                <div>📊 Số đỉnh đã load: <strong>${loadedCount.toLocaleString()}</strong></div>
+                ${totalCount !== loadedCount ? `<div>📊 Tổng số đỉnh trong file: <strong>${totalCount.toLocaleString()}</strong></div>` : ''}
+            `;
+            statsDiv.style.display = 'block';
+        }
+        
+        function createParticlesFromCoordinates() {
+            // Xóa particles cũ
+            particles.forEach(particle => {
+                scene.remove(particle);
+                if (particle.geometry) particle.geometry.dispose();
+                if (particle.material) particle.material.dispose();
+            });
+            particles = [];
+            
+            // Số particles thực tế = min(particleCount, số đỉnh)
+            const actualParticleCount = Math.min(particleCount, jsonCoordinates.length);
+            
+            for (let i = 0; i < actualParticleCount; i++) {
+                const geometry = new THREE.SphereGeometry(0.08, 8, 8);
+                const material = new THREE.MeshBasicMaterial({
+                    color: new THREE.Color().setHSL(0.5 + Math.random() * 0.1, 1, 0.5 + Math.random() * 0.3), // Cyan/blue range
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                const particle = new THREE.Mesh(geometry, material);
+                
+                // Vị trí ngẫu nhiên ban đầu (phân tán rộng)
+                particle.position.x = (Math.random() - 0.5) * 30;
+                particle.position.y = (Math.random() - 0.5) * 30;
+                particle.position.z = (Math.random() - 0.5) * 30;
+                
+                // Lấy tọa độ từ JSON (lặp lại nếu cần)
+                const coordIndex = i % jsonCoordinates.length;
+                const targetCoord = jsonCoordinates[coordIndex];
+                
+                particle.userData = {
+                    targetX: targetCoord.x,
+                    targetY: targetCoord.y,
+                    targetZ: targetCoord.z,
+                    velocityX: 0,
+                    velocityY: 0,
+                    velocityZ: 0,
+                    startTime: Math.random() * 3
+                };
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            console.log(`Created ${actualParticleCount} particles from ${jsonCoordinates.length} coordinates`);
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = Date.now() * 0.001;
+            
+            particles.forEach((particle, i) => {
+                if (time > particle.userData.startTime) {
+                    // Tính lực hút về vị trí đích
+                    const dx = particle.userData.targetX - particle.position.x;
+                    const dy = particle.userData.targetY - particle.position.y;
+                    const dz = particle.userData.targetZ - particle.position.z;
+                    
+                    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    // Lực hút với damping
+                    const force = 0.005;
+                    const damping = 0.92;
+                    
+                    particle.userData.velocityX += dx * force;
+                    particle.userData.velocityY += dy * force;
+                    particle.userData.velocityZ += dz * force;
+                    
+                    // Giới hạn tốc độ tối đa
+                    const maxSpeed = 0.05;
+                    const speed = Math.sqrt(
+                        particle.userData.velocityX ** 2 + 
+                        particle.userData.velocityY ** 2 + 
+                        particle.userData.velocityZ ** 2
+                    );
+                    if (speed > maxSpeed) {
+                        particle.userData.velocityX = (particle.userData.velocityX / speed) * maxSpeed;
+                        particle.userData.velocityY = (particle.userData.velocityY / speed) * maxSpeed;
+                        particle.userData.velocityZ = (particle.userData.velocityZ / speed) * maxSpeed;
+                    }
+                    
+                    particle.userData.velocityX *= damping;
+                    particle.userData.velocityY *= damping;
+                    particle.userData.velocityZ *= damping;
+                    
+                    particle.position.x += particle.userData.velocityX;
+                    particle.position.y += particle.userData.velocityY;
+                    particle.position.z += particle.userData.velocityZ;
+                }
+                
+                // Hiệu ứng sáng lấp lánh
+                particle.material.opacity = 0.7 + Math.sin(time * 3 + i * 0.5) * 0.2;
+            });
+            
+            // Cập nhật controls
+            if (controls) {
+                controls.update();
+            } else {
+                // Chỉ xoay scene tự động nếu không có controls
+                scene.rotation.y = Math.sin(time * 0.2) * 0.2;
+                scene.rotation.x = Math.sin(time * 0.15) * 0.1;
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            if (controls) {
+                controls.handleResize();
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>
