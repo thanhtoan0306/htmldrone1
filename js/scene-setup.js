@@ -23,3 +23,4 @@ function initScene() {
     App.scene.add(pointLight);
 }
 
+
