@@ -181,11 +181,13 @@
             
             <div class="input-group">
                 <label for="vertexInput">🎯 Số đỉnh mục tiêu:</label>
-                <input type="number" id="vertexInput" value="1000" min="1" placeholder="Nhập số đỉnh" />
+                <input type="number" id="vertexInput" value="2500" min="1" placeholder="Nhập số đỉnh" />
             </div>
             
             <button class="btn-primary" id="reduceBtn">⚡ Giảm Đỉnh</button>
+            <button class="btn-primary" id="reduceColorBtn" style="background: linear-gradient(135deg, #9C27B0, #7B1FA2);">🎨 Giảm Đỉnh có Màu</button>
             <button class="btn-export" id="exportBtn" disabled>📤 Xuất JSON Tọa Độ</button>
+            <button class="btn-export" id="exportColorBtn" disabled style="background: linear-gradient(135deg, #9C27B0, #7B1FA2);">🎨 Xuất JSON với Màu</button>
             
             <div id="status" class="status info" style="display: none;"></div>
             
@@ -236,6 +238,7 @@
         let reducedModel = null;
         let originalVertices = [];
         let reducedVertices = [];
+        let reducedVerticesWithColors = []; // Lưu vertices với màu sắc
         let gltfLoader;
 
         // Initialize
@@ -326,7 +329,9 @@
                 // Event listeners
                 document.getElementById('fileInput').addEventListener('change', handleFileSelect);
                 document.getElementById('reduceBtn').addEventListener('click', reduceVertices);
+                document.getElementById('reduceColorBtn').addEventListener('click', reduceVerticesWithColor);
                 document.getElementById('exportBtn').addEventListener('click', exportJSON);
+                document.getElementById('exportColorBtn').addEventListener('click', exportJSONWithColors);
 
                 // Handle window resize
                 window.addEventListener('resize', onWindowResize);
@@ -453,6 +458,76 @@
                 }
             });
         }
+        
+        function getVertexColorFromTexture(mesh, vertexIndex, uv) {
+            // Try to get color from texture if available
+            try {
+                const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+                if (material && material.map) {
+                    const texture = material.map;
+                    // Case 1: Standard image texture (HTMLImageElement or ImageBitmap)
+                    if (texture.image && texture.image.width && texture.image.height) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = texture.image.width;
+                        canvas.height = texture.image.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(texture.image, 0, 0);
+                        
+                        if (uv) {
+                            const x = Math.floor(Math.max(0, Math.min(1, uv.x)) * canvas.width);
+                            const y = Math.floor(Math.max(0, Math.min(1, uv.y)) * canvas.height);
+                            const imageData = ctx.getImageData(x, y, 1, 1);
+                            return {
+                                r: imageData.data[0],
+                                g: imageData.data[1],
+                                b: imageData.data[2],
+                                hex: '#' + [imageData.data[0], imageData.data[1], imageData.data[2]]
+                                    .map(c => c.toString(16).padStart(2, '0')).join('')
+                            };
+                        }
+                    }
+                    // Case 2: DataTexture (thường dùng trong GLB)
+                    if (texture.image && texture.image.data && texture.image.width && texture.image.height) {
+                        const { data, width, height } = texture.image;
+                        if (uv) {
+                            const x = Math.floor(Math.max(0, Math.min(1, uv.x)) * width);
+                            const y = Math.floor(Math.max(0, Math.min(1, uv.y)) * height);
+                            const idx = (y * width + x) * 4;
+                            if (idx + 2 < data.length) {
+                                const r = data[idx];
+                                const g = data[idx + 1];
+                                const b = data[idx + 2];
+                                return {
+                                    r,
+                                    g,
+                                    b,
+                                    hex: '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Error reading texture color:', e);
+            }
+            return null;
+        }
+        
+        function getMaterialColor(mesh) {
+            // Get color from material
+            if (mesh.material) {
+                const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+                if (material && material.color) {
+                    return {
+                        r: Math.floor(material.color.r * 255),
+                        g: Math.floor(material.color.g * 255),
+                        b: Math.floor(material.color.b * 255),
+                        hex: '#' + material.color.getHexString()
+                    };
+                }
+            }
+            return null;
+        }
 
         function reduceVertices() {
             if (!originalModel) {
@@ -468,26 +543,89 @@
 
             showStatus('Đang giảm đỉnh...', 'info');
 
-            // Extract all vertices from original model first
+            // Extract all vertices from original model first (with colors)
             const allVertices = [];
             originalModel.traverse((child) => {
                 if (child.isMesh && child.geometry) {
                     const geometry = child.geometry;
                     if (geometry.attributes && geometry.attributes.position) {
                         const positions = geometry.attributes.position;
+                        const uvs = geometry.attributes.uv;
+                        const vertexColorsAttr = geometry.attributes.color;
                         const matrix = new THREE.Matrix4();
                         child.updateMatrixWorld(true);
                         matrix.copy(child.matrixWorld);
+
+                        // Get material color
+                        let materialColor = null;
+                        if (child.material) {
+                            const material = Array.isArray(child.material) ? child.material[0] : child.material;
+                            if (material.color) {
+                                materialColor = {
+                                    r: Math.floor(material.color.r * 255),
+                                    g: Math.floor(material.color.g * 255),
+                                    b: Math.floor(material.color.b * 255),
+                                    hex: '#' + material.color.getHexString()
+                                };
+                            }
+                        }
 
                         for (let i = 0; i < positions.count; i++) {
                             const vertex = new THREE.Vector3();
                             vertex.fromBufferAttribute(positions, i);
                             vertex.applyMatrix4(matrix);
-                            allVertices.push({
+                            
+                            const vertexData = {
                                 x: vertex.x,
                                 y: vertex.y,
                                 z: vertex.z
-                            });
+                            };
+                            
+                            // Try to get color priority: vertexColor attribute > texture > material > gradient
+                            let vertexColor = null;
+                            
+                            // 1) Vertex color attribute (nếu mesh đã có màu sẵn)
+                            if (vertexColorsAttr) {
+                                vertexColor = {
+                                    r: Math.floor(vertexColorsAttr.getX(i) * 255),
+                                    g: Math.floor(vertexColorsAttr.getY(i) * 255),
+                                    b: Math.floor(vertexColorsAttr.getZ(i) * 255),
+                                    hex: '#' + [
+                                        Math.floor(vertexColorsAttr.getX(i) * 255),
+                                        Math.floor(vertexColorsAttr.getY(i) * 255),
+                                        Math.floor(vertexColorsAttr.getZ(i) * 255)
+                                    ].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                            
+                            // 2) Texture map
+                            if (!vertexColor && uvs && child.material && child.material.map) {
+                                const uv = new THREE.Vector2();
+                                uv.fromBufferAttribute(uvs, i);
+                                vertexColor = getVertexColorFromTexture(child, i, uv);
+                            }
+                            
+                            // Use texture color, material color, or default gradient
+                            if (vertexColor) {
+                                vertexData.color = vertexColor;
+                            } else if (materialColor) {
+                                vertexData.color = materialColor;
+                            } else {
+                                // Default color based on position (gradient)
+                                const normalizedY = (vertex.y + 10) / 20; // Normalize to 0-1
+                                vertexData.color = {
+                                    r: Math.floor(100 + normalizedY * 155),
+                                    g: Math.floor(150 + normalizedY * 105),
+                                    b: Math.floor(200 + normalizedY * 55),
+                                    hex: '#' + [
+                                        Math.floor(100 + normalizedY * 155),
+                                        Math.floor(150 + normalizedY * 105),
+                                        Math.floor(200 + normalizedY * 55)
+                                    ].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                            
+                            allVertices.push(vertexData);
                         }
                     }
                 }
@@ -495,13 +633,20 @@
 
             // Sample vertices to target count
             reducedVertices.length = 0;
+            reducedVerticesWithColors.length = 0;
             if (allVertices.length > targetVertices) {
                 const step = Math.ceil(allVertices.length / targetVertices);
                 for (let i = 0; i < allVertices.length; i += step) {
-                    reducedVertices.push(allVertices[i]);
+                    reducedVertices.push({
+                        x: allVertices[i].x,
+                        y: allVertices[i].y,
+                        z: allVertices[i].z
+                    });
+                    reducedVerticesWithColors.push(allVertices[i]); // Keep color info
                 }
             } else {
-                reducedVertices.push(...allVertices);
+                reducedVertices.push(...allVertices.map(v => ({x: v.x, y: v.y, z: v.z})));
+                reducedVerticesWithColors.push(...allVertices);
             }
             
             // Remove old reduced model/points
@@ -563,9 +708,205 @@
             const originalTriangles = countTriangles(originalModel);
             updateInfo(originalVertices.length, reducedVertices.length, originalTriangles, 0);
 
-            // Enable export button
+            // Enable export buttons
             document.getElementById('exportBtn').disabled = false;
+            document.getElementById('exportColorBtn').disabled = false;
             showStatus('Giảm đỉnh thành công!', 'success');
+        }
+        
+        function reduceVerticesWithColor() {
+            if (!originalModel) {
+                showStatus('Vui lòng load file GLB trước!', 'error');
+                return;
+            }
+
+            const targetVertices = parseInt(document.getElementById('vertexInput').value);
+            if (!targetVertices || targetVertices <= 0) {
+                showStatus('Số đỉnh không hợp lệ!', 'error');
+                return;
+            }
+
+            showStatus('Đang giảm đỉnh với màu sắc...', 'info');
+
+            // Extract all vertices from original model with colors
+            const allVertices = [];
+            originalModel.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const geometry = child.geometry;
+                    if (geometry.attributes && geometry.attributes.position) {
+                        const positions = geometry.attributes.position;
+                        const uvs = geometry.attributes.uv;
+                        const vertexColorsAttr = geometry.attributes.color;
+                        const matrix = new THREE.Matrix4();
+                        child.updateMatrixWorld(true);
+                        matrix.copy(child.matrixWorld);
+
+                        // Get material color
+                        let materialColor = null;
+                        if (child.material) {
+                            const material = Array.isArray(child.material) ? child.material[0] : child.material;
+                            if (material.color) {
+                                materialColor = {
+                                    r: Math.floor(material.color.r * 255),
+                                    g: Math.floor(material.color.g * 255),
+                                    b: Math.floor(material.color.b * 255),
+                                    hex: '#' + material.color.getHexString()
+                                };
+                            }
+                        }
+
+                        for (let i = 0; i < positions.count; i++) {
+                            const vertex = new THREE.Vector3();
+                            vertex.fromBufferAttribute(positions, i);
+                            vertex.applyMatrix4(matrix);
+                            
+                            const vertexData = {
+                                x: vertex.x,
+                                y: vertex.y,
+                                z: vertex.z
+                            };
+                            
+                            // Try to get color priority: vertexColor attribute > texture > material > gradient
+                            let vertexColor = null;
+                            
+                            // 1) Vertex color attribute (nếu mesh đã có màu sẵn)
+                            if (vertexColorsAttr) {
+                                vertexColor = {
+                                    r: Math.floor(vertexColorsAttr.getX(i) * 255),
+                                    g: Math.floor(vertexColorsAttr.getY(i) * 255),
+                                    b: Math.floor(vertexColorsAttr.getZ(i) * 255),
+                                    hex: '#' + [
+                                        Math.floor(vertexColorsAttr.getX(i) * 255),
+                                        Math.floor(vertexColorsAttr.getY(i) * 255),
+                                        Math.floor(vertexColorsAttr.getZ(i) * 255)
+                                    ].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                            
+                            // 2) Texture map
+                            if (!vertexColor && uvs && child.material && child.material.map) {
+                                const uv = new THREE.Vector2();
+                                uv.fromBufferAttribute(uvs, i);
+                                vertexColor = getVertexColorFromTexture(child, i, uv);
+                            }
+                            
+                            // Use texture color, material color, or default gradient
+                            if (vertexColor) {
+                                vertexData.color = vertexColor;
+                            } else if (materialColor) {
+                                vertexData.color = materialColor;
+                            } else {
+                                // Default color based on position (gradient)
+                                const normalizedY = (vertex.y + 10) / 20; // Normalize to 0-1
+                                vertexData.color = {
+                                    r: Math.floor(100 + normalizedY * 155),
+                                    g: Math.floor(150 + normalizedY * 105),
+                                    b: Math.floor(200 + normalizedY * 55),
+                                    hex: '#' + [
+                                        Math.floor(100 + normalizedY * 155),
+                                        Math.floor(150 + normalizedY * 105),
+                                        Math.floor(200 + normalizedY * 55)
+                                    ].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                            
+                            allVertices.push(vertexData);
+                        }
+                    }
+                }
+            });
+
+            // Sample vertices to target count
+            reducedVertices.length = 0;
+            reducedVerticesWithColors.length = 0;
+            if (allVertices.length > targetVertices) {
+                const step = Math.ceil(allVertices.length / targetVertices);
+                for (let i = 0; i < allVertices.length; i += step) {
+                    reducedVertices.push({
+                        x: allVertices[i].x,
+                        y: allVertices[i].y,
+                        z: allVertices[i].z
+                    });
+                    reducedVerticesWithColors.push(allVertices[i]); // Keep color info
+                }
+            } else {
+                reducedVertices.push(...allVertices.map(v => ({x: v.x, y: v.y, z: v.z})));
+                reducedVerticesWithColors.push(...allVertices);
+            }
+            
+            // Remove old reduced model/points
+            if (reducedModel) {
+                reducedScene.remove(reducedModel);
+                // Dispose if it's a Points object
+                if (reducedModel.geometry) reducedModel.geometry.dispose();
+                if (reducedModel.material) {
+                    if (Array.isArray(reducedModel.material)) {
+                        reducedModel.material.forEach(mat => mat.dispose());
+                    } else {
+                        reducedModel.material.dispose();
+                    }
+                }
+            }
+
+            // Create colored points from reduced vertices with colors
+            if (reducedVerticesWithColors.length > 0) {
+                const positions = new Float32Array(reducedVerticesWithColors.length * 3);
+                const colors = new Float32Array(reducedVerticesWithColors.length * 3);
+                
+                for (let i = 0; i < reducedVerticesWithColors.length; i++) {
+                    const v = reducedVerticesWithColors[i];
+                    positions[i * 3] = v.x;
+                    positions[i * 3 + 1] = v.y;
+                    positions[i * 3 + 2] = v.z;
+                    
+                    // Set color from vertex data
+                    const color = v.color || { r: 255, g: 255, b: 255 };
+                    colors[i * 3] = color.r / 255;
+                    colors[i * 3 + 1] = color.g / 255;
+                    colors[i * 3 + 2] = color.b / 255;
+                }
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                // Create points material with vertex colors
+                const material = new THREE.PointsMaterial({
+                    size: 0.1,
+                    sizeAttenuation: true,
+                    transparent: true,
+                    opacity: 0.9,
+                    vertexColors: true, // Enable vertex colors
+                    blending: THREE.AdditiveBlending
+                });
+
+                reducedModel = new THREE.Points(geometry, material);
+                reducedScene.add(reducedModel);
+
+                // Calculate bounding box and center
+                const box = new THREE.Box3().setFromObject(reducedModel);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                
+                if (maxDim > 0) {
+                    reducedCamera.position.set(center.x + maxDim * 1.5, center.y + maxDim * 1.5, center.z + maxDim * 1.5);
+                    reducedCamera.lookAt(center);
+                    if (reducedControls) {
+                        reducedControls.target.copy(center);
+                        reducedControls.update();
+                    }
+                }
+            }
+
+            // Update info
+            const originalTriangles = countTriangles(originalModel);
+            updateInfo(originalVertices.length, reducedVertices.length, originalTriangles, 0);
+
+            // Enable export buttons
+            document.getElementById('exportBtn').disabled = false;
+            document.getElementById('exportColorBtn').disabled = false;
+            showStatus('Giảm đỉnh với màu sắc thành công!', 'success');
         }
 
         function countTriangles(object) {
@@ -617,6 +958,45 @@
             URL.revokeObjectURL(url);
 
             showStatus('Đã xuất JSON thành công!', 'success');
+        }
+        
+        function exportJSONWithColors() {
+            if (reducedVerticesWithColors.length === 0) {
+                showStatus('Không có dữ liệu để xuất!', 'error');
+                return;
+            }
+
+            const data = {
+                metadata: {
+                    totalVertices: reducedVerticesWithColors.length,
+                    exportDate: new Date().toISOString(),
+                    hasColors: true
+                },
+                vertices: reducedVerticesWithColors.map(v => ({
+                    x: v.x,
+                    y: v.y,
+                    z: v.z,
+                    color: v.color || {
+                        r: 255,
+                        g: 255,
+                        b: 255,
+                        hex: '#ffffff'
+                    }
+                }))
+            };
+
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vertices_colors_${reducedVerticesWithColors.length}_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showStatus('Đã xuất JSON với màu sắc thành công!', 'success');
         }
 
         function showStatus(message, type) {

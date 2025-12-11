@@ -89,6 +89,45 @@
             padding: 8px 16px;
             border-radius: 15px;
         }
+        #formationSelector {
+            position: absolute;
+            top: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 20px;
+            border-radius: 15px;
+            max-width: 90%;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        #formationSelector h3 {
+            margin: 0 0 10px 0;
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+        }
+        .formation-option {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .formation-option input[type="radio"] {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .formation-option label {
+            cursor: pointer;
+            flex: 1;
+        }
+        .formation-option:hover {
+            color: #00FFFF;
+        }
     </style>
 </head>
 <body>
@@ -98,6 +137,10 @@
         <input type="file" id="jsonFile" accept=".json" />
     </div>
     <div id="stats"></div>
+    <div id="formationSelector">
+        <h3>🎯 Chọn Đội Hình</h3>
+        <div id="formationOptions"></div>
+    </div>
     <div id="controlsHint">🖱️ Kéo chuột để xoay | Scroll để zoom | Giữ chuột giữa để pan</div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -105,6 +148,8 @@
         let scene, camera, renderer, particles = [];
         let controls;
         let jsonCoordinates = [];
+        let formations = []; // Mảng lưu các đội hình đã load: [{name, coordinates}]
+        let currentFormationIndex = -1; // -1 = chưa có, >= 0 = đội hình từ JSON
         const particleCount = 2000; // Số particles tối đa
         
         function init() {
@@ -185,7 +230,7 @@
             console.log(`Loaded ${vertices.length} vertices from JSON`);
             
             // Parse tọa độ
-            jsonCoordinates = vertices.map(v => ({
+            const coordinates = vertices.map(v => ({
                 x: parseFloat(v.x) || 0,
                 y: parseFloat(v.y) || 0,
                 z: parseFloat(v.z) || 0
@@ -195,33 +240,43 @@
                 Number.isFinite(v.z)
             );
             
-            if (jsonCoordinates.length === 0) {
+            if (coordinates.length === 0) {
                 alert('Không tìm thấy tọa độ hợp lệ trong file JSON!');
                 return;
             }
             
             // Normalize tọa độ để fit vào scene
-            normalizeCoordinates();
+            const normalizedCoords = normalizeCoordinates(coordinates);
+            
+            // Tạo tên đội hình từ tên file hoặc metadata
+            const fileName = document.getElementById('jsonFile').files[0]?.name || 'formation';
+            const formationName = fileName.replace('.json', '').replace('3d', '').substring(0, 30);
+            
+            // Thêm vào mảng formations
+            const newFormation = {
+                name: formationName,
+                coordinates: normalizedCoords,
+                totalVertices: totalVertices
+            };
+            formations.push(newFormation);
             
             // Hiển thị thông tin
-            updateStats(jsonCoordinates.length, totalVertices);
+            updateStats(normalizedCoords.length, totalVertices);
             
-            // Tạo particles
-            createParticlesFromCoordinates();
+            // Cập nhật UI radio buttons
+            updateFormationSelector();
             
-            // Cập nhật info
-            const infoDiv = document.getElementById('info');
-            infoDiv.innerHTML = `🦋 Đội Hình ${jsonCoordinates.length} Điểm 🦋`;
-            infoDiv.style.color = '#00FFFF';
+            // Tự động chuyển sang đội hình mới
+            switchToFormation(formations.length - 1);
         }
         
-        function normalizeCoordinates() {
-            if (jsonCoordinates.length === 0) return;
+        function normalizeCoordinates(coordinates) {
+            if (coordinates.length === 0) return [];
             
             // Tính center và scale
-            const xs = jsonCoordinates.map(v => v.x);
-            const ys = jsonCoordinates.map(v => v.y);
-            const zs = jsonCoordinates.map(v => v.z);
+            const xs = coordinates.map(v => v.x);
+            const ys = coordinates.map(v => v.y);
+            const zs = coordinates.map(v => v.z);
             
             const centerX = (Math.max(...xs) + Math.min(...xs)) / 2;
             const centerY = (Math.max(...ys) + Math.min(...ys)) / 2;
@@ -236,11 +291,58 @@
             const scale = maxRange > 0 ? 20 / maxRange : 1;
             
             // Normalize tọa độ
-            jsonCoordinates = jsonCoordinates.map(v => ({
+            return coordinates.map(v => ({
                 x: (v.x - centerX) * scale,
                 y: (v.y - centerY) * scale,
                 z: (v.z - centerZ) * scale
             }));
+        }
+        
+        function updateFormationSelector() {
+            const selector = document.getElementById('formationSelector');
+            const options = document.getElementById('formationOptions');
+            
+            // Xóa các options cũ
+            options.innerHTML = '';
+            
+            // Thêm options cho các đội hình JSON
+            formations.forEach((formation, index) => {
+                const option = document.createElement('div');
+                option.className = 'formation-option';
+                option.innerHTML = `
+                    <input type="radio" id="formation-${index}" name="formation" value="${index}" ${currentFormationIndex === index ? 'checked' : ''}>
+                    <label for="formation-${index}">📐 ${formation.name} (${formation.coordinates.length} đỉnh)</label>
+                `;
+                option.querySelector('input').addEventListener('change', () => switchToFormation(index));
+                options.appendChild(option);
+            });
+            
+            // Hiển thị selector nếu có ít nhất 1 đội hình
+            if (formations.length > 0) {
+                selector.style.display = 'block';
+            }
+        }
+        
+        function switchToFormation(index) {
+            if (index < 0 || index >= formations.length) return;
+            
+            currentFormationIndex = index;
+            const formation = formations[index];
+            jsonCoordinates = formation.coordinates;
+            
+            // Tạo particles từ đội hình mới
+            createParticlesFromCoordinates();
+            
+            // Cập nhật info
+            const infoDiv = document.getElementById('info');
+            infoDiv.innerHTML = `🦋 ${formation.name} (${formation.coordinates.length} điểm) 🦋`;
+            infoDiv.style.color = '#00FFFF';
+            
+            // Cập nhật stats
+            updateStats(formation.coordinates.length, formation.totalVertices);
+            
+            // Cập nhật radio buttons
+            updateFormationSelector();
         }
         
         function updateStats(loadedCount, totalCount) {
@@ -253,6 +355,8 @@
         }
         
         function createParticlesFromCoordinates() {
+            if (!jsonCoordinates || jsonCoordinates.length === 0) return;
+            
             // Xóa particles cũ
             particles.forEach(particle => {
                 scene.remove(particle);
