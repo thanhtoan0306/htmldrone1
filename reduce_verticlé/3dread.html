@@ -148,7 +148,9 @@
         let scene, camera, renderer, particles = [];
         let controls;
         let jsonCoordinates = [];
-        let formations = []; // Mảng lưu các đội hình đã load: [{name, coordinates}]
+        let jsonColors = []; // màu cho từng đỉnh (nếu có)
+        let hasColors = false;
+        let formations = []; // Mảng lưu các đội hình đã load: [{name, coordinates, colors, hasColors}]
         let currentFormationIndex = -1; // -1 = chưa có, >= 0 = đội hình từ JSON
         const particleCount = 2000; // Số particles tối đa
         
@@ -229,16 +231,42 @@
             
             console.log(`Loaded ${vertices.length} vertices from JSON`);
             
-            // Parse tọa độ
-            const coordinates = vertices.map(v => ({
-                x: parseFloat(v.x) || 0,
-                y: parseFloat(v.y) || 0,
-                z: parseFloat(v.z) || 0
-            })).filter(v => 
-                Number.isFinite(v.x) && 
-                Number.isFinite(v.y) && 
-                Number.isFinite(v.z)
-            );
+            // Xác định có màu không
+            hasColors = !!(vertices.length > 0 && vertices[0].color) || !!jsonData.metadata?.hasColors;
+            
+            // Parse tọa độ + màu
+            const coordinates = [];
+            const colors = [];
+            vertices.forEach(v => {
+                const x = parseFloat(v.x);
+                const y = parseFloat(v.y);
+                const z = parseFloat(v.z);
+                if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+                    coordinates.push({ x, y, z });
+                    if (hasColors && v.color) {
+                        if (typeof v.color === 'string') {
+                            const hex = v.color.replace('#', '');
+                            colors.push({
+                                r: parseInt(hex.substring(0, 2), 16),
+                                g: parseInt(hex.substring(2, 4), 16),
+                                b: parseInt(hex.substring(4, 6), 16),
+                                hex: v.color.startsWith('#') ? v.color : '#' + v.color
+                            });
+                        } else if (typeof v.color === 'object') {
+                            colors.push({
+                                r: v.color.r ?? 255,
+                                g: v.color.g ?? 255,
+                                b: v.color.b ?? 255,
+                                hex: v.color.hex ?? `#${[(v.color.r ?? 255),(v.color.g ?? 255),(v.color.b ?? 255)].map(c=>c.toString(16).padStart(2,'0')).join('')}`
+                            });
+                        } else {
+                            colors.push(null);
+                        }
+                    } else {
+                        colors.push(null);
+                    }
+                }
+            });
             
             if (coordinates.length === 0) {
                 alert('Không tìm thấy tọa độ hợp lệ trong file JSON!');
@@ -256,6 +284,8 @@
             const newFormation = {
                 name: formationName,
                 coordinates: normalizedCoords,
+                colors: hasColors ? colors : null,
+                hasColors,
                 totalVertices: totalVertices
             };
             formations.push(newFormation);
@@ -329,13 +359,16 @@
             currentFormationIndex = index;
             const formation = formations[index];
             jsonCoordinates = formation.coordinates;
+            jsonColors = formation.colors || [];
+            hasColors = formation.hasColors || false;
             
             // Tạo particles từ đội hình mới
             createParticlesFromCoordinates();
             
             // Cập nhật info
             const infoDiv = document.getElementById('info');
-            infoDiv.innerHTML = `🦋 ${formation.name} (${formation.coordinates.length} điểm) 🦋`;
+            const colorIcon = hasColors ? '🎨' : '🦋';
+            infoDiv.innerHTML = `${colorIcon} ${formation.name} (${formation.coordinates.length} điểm) ${colorIcon}`;
             infoDiv.style.color = '#00FFFF';
             
             // Cập nhật stats
@@ -370,8 +403,24 @@
             
             for (let i = 0; i < actualParticleCount; i++) {
                 const geometry = new THREE.SphereGeometry(0.08, 8, 8);
+
+                // Lấy tọa độ từ JSON (lặp lại nếu cần)
+                const coordIndex = i % jsonCoordinates.length;
+                const targetCoord = jsonCoordinates[coordIndex];
+
+                // Màu: ưu tiên màu từ JSON nếu có
+                let particleColor = new THREE.Color().setHSL(0.5 + Math.random() * 0.1, 1, 0.5 + Math.random() * 0.3); // mặc định cyan
+                if (hasColors && jsonColors && jsonColors[coordIndex]) {
+                    const c = jsonColors[coordIndex];
+                    if (c.hex) {
+                        particleColor = new THREE.Color(c.hex);
+                    } else {
+                        particleColor = new THREE.Color(c.r / 255, c.g / 255, c.b / 255);
+                    }
+                }
+
                 const material = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color().setHSL(0.5 + Math.random() * 0.1, 1, 0.5 + Math.random() * 0.3), // Cyan/blue range
+                    color: particleColor,
                     transparent: true,
                     opacity: 0.9
                 });
@@ -382,10 +431,6 @@
                 particle.position.x = (Math.random() - 0.5) * 30;
                 particle.position.y = (Math.random() - 0.5) * 30;
                 particle.position.z = (Math.random() - 0.5) * 30;
-                
-                // Lấy tọa độ từ JSON (lặp lại nếu cần)
-                const coordIndex = i % jsonCoordinates.length;
-                const targetCoord = jsonCoordinates[coordIndex];
                 
                 particle.userData = {
                     targetX: targetCoord.x,
@@ -401,7 +446,7 @@
                 particles.push(particle);
             }
             
-            console.log(`Created ${actualParticleCount} particles from ${jsonCoordinates.length} coordinates`);
+            console.log(`Created ${actualParticleCount} particles from ${jsonCoordinates.length} coordinates${hasColors ? ' with colors' : ''}`);
         }
         
         function animate() {
