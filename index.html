@@ -3,136 +3,1526 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sứa Neon 3D</title>
+    <title>Đội Hình 3D & Giảm Đỉnh</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             margin: 0;
             overflow: hidden;
-            background: #000000;
-            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0015 0%, #1a0033 100%);
+            font-family: 'Arial', sans-serif;
+            color: #fff;
         }
-        canvas {
-            display: block;
+        .container {
+            display: flex;
+            height: 100vh;
         }
-        .info {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #ff0080;
-            font-size: 14px;
-            text-shadow: 0 0 10px #ff0080;
+        .sidebar {
+            width: 300px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 2px solid rgba(255, 255, 255, 0.1);
             z-index: 100;
         }
-        .next-button {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .mode-btn.active {
+            background: linear-gradient(135deg, #00FFFF, #0099CC);
+            border-color: #00FFFF;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+        }
+        .mode-btn:hover {
+            transform: translateY(-2px);
+        }
+        .mode-content {
             display: none;
         }
-        .next-button.visible {
+        .mode-content.active {
             display: block;
         }
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #ff0080, #9d00ff);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(255, 0, 128, 0.4);
-            transition: all 0.3s ease;
-            z-index: 100;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .next-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 0, 128, 0.6);
-            background: linear-gradient(135deg, #ff3366, #b300ff);
-        }
-        .next-button:active {
-            transform: translateY(0);
-        }
-        .input-panel {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            padding: 30px 40px;
-            border-radius: 15px;
-            border: 2px solid #ff0080;
-            box-shadow: 0 0 30px rgba(255, 0, 128, 0.5);
-            z-index: 200;
+        h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #00FFFF;
             text-align: center;
         }
-        .input-panel.hidden {
-            display: none;
-        }
-        .input-panel h3 {
-            color: #ff0080;
-            margin: 0 0 20px 0;
-            font-size: 18px;
-            text-shadow: 0 0 10px #ff0080;
-        }
-        .input-panel input {
-            padding: 12px 20px;
-            font-size: 16px;
-            border: 2px solid #9d00ff;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #ffffff;
-            width: 300px;
-            margin-bottom: 15px;
-            outline: none;
-        }
-        .input-panel input:focus {
-            border-color: #ff0080;
-            box-shadow: 0 0 15px rgba(255, 0, 128, 0.3);
-        }
-        .input-panel .hint {
-            color: #9d00ff;
-            font-size: 12px;
+        .input-group {
             margin-bottom: 15px;
         }
-        .ok-button {
-            padding: 10px 30px;
-            background: linear-gradient(135deg, #ff0080, #9d00ff);
-            color: white;
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #ccc;
+        }
+        input[type="file"],
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 13px;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
+            border-radius: 5px;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
         }
-        .ok-button:hover {
+        .btn-primary {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+        .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(255, 0, 128, 0.6);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+        .btn-export {
+            background: linear-gradient(135deg, #FF9800, #F57C00);
+            color: white;
+        }
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+        }
+        .btn-color {
+            background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+            color: white;
+        }
+        .btn-color:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(156, 39, 176, 0.4);
+        }
+        .info-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 11px;
+        }
+        .info-box h3 {
+            margin-bottom: 8px;
+            color: #4CAF50;
+            font-size: 12px;
+        }
+        .info-item {
+            margin: 4px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status {
+            padding: 8px;
+            border-radius: 5px;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 12px;
+            display: none;
+        }
+        .status.success {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid #4CAF50;
+        }
+        .status.error {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid #f44336;
+        }
+        .status.info {
+            background: rgba(33, 150, 243, 0.3);
+            border: 1px solid #2196F3;
+        }
+        .main-content {
+            flex: 1;
+            position: relative;
+        }
+        /* Mode Read: Fullscreen viewer */
+        .viewer-read {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .viewer-read canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        /* Mode Reduce: Side-by-side viewers */
+        .viewer-reduce {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            height: 100%;
+        }
+        .viewer {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            position: relative;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+        }
+        .viewer-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .viewer canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 10px;
+        }
+        /* Overlay UI for Read mode */
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00FFFF;
+            text-align: center;
+            font-size: 24px;
+            text-shadow: 0 0 10px #00FFFF, 0 0 20px #00FFFF;
+            z-index: 10;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+        .formation-option {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .formation-option input[type="radio"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .formation-option label {
+            cursor: pointer;
+            flex: 1;
+        }
+        .formation-option:hover {
+            color: #00FFFF;
+        }
+        #controlsHint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            font-size: 12px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 16px;
+            border-radius: 15px;
         }
     </style>
 </head>
 <body>
-    <div class="info" id="infoText">
-        Nhập tên đội hình
+    <div class="container">
+        <div class="sidebar">
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="modeReadBtn" onclick="switchMode('read')">📖 Đọc JSON</button>
+                <button class="mode-btn" id="modeReduceBtn" onclick="switchMode('reduce')">🔧 Giảm Đỉnh</button>
+            </div>
+            
+            <!-- Mode Read Content -->
+            <div class="mode-content active" id="modeReadContent">
+                <h2>📖 Đọc Đội Hình JSON</h2>
+                <div class="input-group">
+                    <label for="jsonFile">📁 Chọn file JSON:</label>
+                    <input type="file" id="jsonFile" accept=".json" />
+                </div>
+                <div id="stats" style="display: none; margin-top: 15px; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 5px; font-size: 12px;"></div>
+                <div id="formationSelector" style="display: none; margin-top: 15px; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 5px; max-height: 200px; overflow-y: auto;">
+                    <h3 style="margin: 0 0 10px 0; color: #fff; font-size: 13px; text-align: center;">🎯 Chọn Đội Hình</h3>
+                    <div id="formationOptions"></div>
+                </div>
+            </div>
+            
+            <!-- Mode Reduce Content -->
+            <div class="mode-content" id="modeReduceContent">
+                <h2>🔧 Giảm Đỉnh GLB</h2>
+                <div class="input-group">
+                    <label for="fileInput">📁 Chọn file GLB:</label>
+                    <input type="file" id="fileInput" accept=".glb,.gltf" />
+                </div>
+                <div class="input-group">
+                    <label for="vertexInput">🎯 Số đỉnh mục tiêu:</label>
+                    <input type="number" id="vertexInput" value="2500" min="1" placeholder="Nhập số đỉnh" />
+                </div>
+                <button class="btn-primary" id="reduceBtn">⚡ Giảm Đỉnh</button>
+                <button class="btn-color" id="reduceColorBtn">🎨 Giảm Đỉnh có Màu</button>
+                <button class="btn-export" id="exportBtn" disabled>📤 Xuất JSON Tọa Độ</button>
+                <button class="btn-export btn-color" id="exportColorBtn" disabled>🎨 Xuất JSON với Màu</button>
+                <div id="status" class="status info"></div>
+                <div class="info-box" id="infoBox" style="display: none;">
+                    <h3>📊 Thông tin Model</h3>
+                    <div class="info-item">
+                        <span>Đỉnh gốc:</span>
+                        <span id="originalVertices">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Đỉnh sau giảm:</span>
+                        <span id="reducedVertices">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Tam giác gốc:</span>
+                        <span id="originalTriangles">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Tam giác sau giảm:</span>
+                        <span id="reducedTriangles">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <!-- Mode Read: Fullscreen viewer -->
+            <div class="viewer-read" id="viewerRead">
+                <div id="info">🚁 Đội Hình 3D từ JSON 🚁</div>
+                <div id="controlsHint">🖱️ Kéo chuột để xoay | Scroll để zoom | Giữ chuột giữa để pan</div>
+                <canvas id="readCanvas"></canvas>
+            </div>
+            
+            <!-- Mode Reduce: Side-by-side viewers -->
+            <div class="viewer-reduce" id="viewerReduce" style="display: none;">
+                <div class="viewer" id="originalViewer">
+                    <div class="viewer-label">📥 Input (Gốc)</div>
+                    <canvas id="originalCanvas"></canvas>
+                </div>
+                <div class="viewer" id="reducedViewer">
+                    <div class="viewer-label">📤 Output (Đã giảm)</div>
+                    <canvas id="reducedCanvas"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="input-panel" id="inputPanel">
-        <h3>🎨 Tạo Đội Hình</h3>
-        <input type="text" id="formationInput" placeholder="Nhập tên đội hình..." onkeypress="handleKeyPress(event)">
-        <div class="hint">Gợi ý: jellyfish, sunflower, tiger, dragon</div>
-        <button class="ok-button" onclick="createFormationFromText()">OK</button>
-    </div>
-    <button class="next-button" onclick="switchFormation()">NEXT</button>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="js/config.js"></script>
-    <script src="js/scene-setup.js"></script>
-    <script src="js/particle-system.js"></script>
-    <script src="js/particles.js"></script>
-    <script src="js/events.js"></script>
-    <script src="js/animation.js"></script>
-    <script src="js/controller.js"></script>
-    <script src="js/text-formation.js"></script>
-    <script src="js/main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/meshoptimizer@0.19.0/meshopt_decoder.js"></script>
+    <script>
+        // ========== MODE SWITCHING ==========
+        let currentMode = 'read';
+        
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            // Update buttons
+            document.getElementById('modeReadBtn').classList.toggle('active', mode === 'read');
+            document.getElementById('modeReduceBtn').classList.toggle('active', mode === 'reduce');
+            
+            // Update content
+            document.getElementById('modeReadContent').classList.toggle('active', mode === 'read');
+            document.getElementById('modeReduceContent').classList.toggle('active', mode === 'reduce');
+            
+            // Update viewers
+            document.getElementById('viewerRead').style.display = mode === 'read' ? 'block' : 'none';
+            document.getElementById('viewerReduce').style.display = mode === 'reduce' ? 'flex' : 'none';
+            
+            // Handle resize
+            setTimeout(() => {
+                onWindowResize();
+            }, 100);
+        }
+        
+        // ========== MODE READ: JSON Formation Viewer ==========
+        let scene, camera, renderer, particles = [];
+        let controls;
+        let jsonCoordinates = [];
+        let jsonColors = [];
+        let hasColors = false;
+        let formations = [];
+        let currentFormationIndex = -1;
+        const particleCount = 2000;
+        
+        function initReadMode() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 15;
+            
+            const canvas = document.getElementById('readCanvas');
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth - 300, window.innerHeight);
+            
+            if (typeof THREE.OrbitControls !== 'undefined') {
+                controls = new THREE.OrbitControls(camera, canvas);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.enableZoom = true;
+                controls.enablePan = true;
+                controls.minDistance = 5;
+                controls.maxDistance = 50;
+            }
+            
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            const light1 = new THREE.PointLight(0x00FFFF, 2, 50);
+            light1.position.set(0, 0, 10);
+            scene.add(light1);
+            
+            const light2 = new THREE.PointLight(0x00FFFF, 1.5, 50);
+            light2.position.set(5, 5, 5);
+            scene.add(light2);
+            
+            const light3 = new THREE.PointLight(0x00FFFF, 1.5, 50);
+            light3.position.set(-5, -5, 5);
+            scene.add(light3);
+            
+            document.getElementById('jsonFile').addEventListener('change', handleJSONFileSelect);
+        }
+        
+        function handleJSONFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    parseJSONData(jsonData);
+                } catch (error) {
+                    console.error('Error parsing JSON:', error);
+                    alert('Lỗi khi parse file JSON: ' + error.message);
+                }
+            };
+            reader.onerror = function() {
+                alert('Lỗi khi đọc file!');
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseJSONData(jsonData) {
+            if (!jsonData.vertices || !Array.isArray(jsonData.vertices)) {
+                alert('File JSON không hợp lệ! Cần có mảng "vertices".');
+                return;
+            }
+            
+            const vertices = jsonData.vertices;
+            const totalVertices = jsonData.metadata?.totalVertices || vertices.length;
+            
+            console.log(`Loaded ${vertices.length} vertices from JSON`);
+            
+            hasColors = !!(vertices.length > 0 && vertices[0].color) || !!jsonData.metadata?.hasColors;
+            
+            const coordinates = [];
+            const colors = [];
+            vertices.forEach(v => {
+                const x = parseFloat(v.x);
+                const y = parseFloat(v.y);
+                const z = parseFloat(v.z);
+                if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+                    coordinates.push({ x, y, z });
+                    if (hasColors && v.color) {
+                        if (typeof v.color === 'string') {
+                            const hex = v.color.replace('#', '');
+                            colors.push({
+                                r: parseInt(hex.substring(0, 2), 16),
+                                g: parseInt(hex.substring(2, 4), 16),
+                                b: parseInt(hex.substring(4, 6), 16),
+                                hex: v.color.startsWith('#') ? v.color : '#' + v.color
+                            });
+                        } else if (typeof v.color === 'object') {
+                            colors.push({
+                                r: v.color.r ?? 255,
+                                g: v.color.g ?? 255,
+                                b: v.color.b ?? 255,
+                                hex: v.color.hex ?? `#${[(v.color.r ?? 255),(v.color.g ?? 255),(v.color.b ?? 255)].map(c=>c.toString(16).padStart(2,'0')).join('')}`
+                            });
+                        } else {
+                            colors.push(null);
+                        }
+                    } else {
+                        colors.push(null);
+                    }
+                }
+            });
+            
+            if (coordinates.length === 0) {
+                alert('Không tìm thấy tọa độ hợp lệ trong file JSON!');
+                return;
+            }
+            
+            const normalizedCoords = normalizeCoordinates(coordinates);
+            
+            const fileName = document.getElementById('jsonFile').files[0]?.name || 'formation';
+            const formationName = fileName.replace('.json', '').replace('3d', '').substring(0, 30);
+            
+            const newFormation = {
+                name: formationName,
+                coordinates: normalizedCoords,
+                colors: hasColors ? colors : null,
+                hasColors,
+                totalVertices: totalVertices
+            };
+            formations.push(newFormation);
+            
+            updateStats(normalizedCoords.length, totalVertices);
+            updateFormationSelector();
+            switchToFormation(formations.length - 1);
+        }
+        
+        function normalizeCoordinates(coordinates) {
+            if (coordinates.length === 0) return [];
+            
+            const xs = coordinates.map(v => v.x);
+            const ys = coordinates.map(v => v.y);
+            const zs = coordinates.map(v => v.z);
+            
+            const centerX = (Math.max(...xs) + Math.min(...xs)) / 2;
+            const centerY = (Math.max(...ys) + Math.min(...ys)) / 2;
+            const centerZ = (Math.max(...zs) + Math.min(...zs)) / 2;
+            
+            const rangeX = Math.max(...xs) - Math.min(...xs);
+            const rangeY = Math.max(...ys) - Math.min(...ys);
+            const rangeZ = Math.max(...zs) - Math.min(...zs);
+            const maxRange = Math.max(rangeX, rangeY, rangeZ);
+            
+            const scale = maxRange > 0 ? 20 / maxRange : 1;
+            
+            return coordinates.map(v => ({
+                x: (v.x - centerX) * scale,
+                y: (v.y - centerY) * scale,
+                z: (v.z - centerZ) * scale
+            }));
+        }
+        
+        function updateFormationSelector() {
+            const selector = document.getElementById('formationSelector');
+            const options = document.getElementById('formationOptions');
+            
+            options.innerHTML = '';
+            
+            formations.forEach((formation, index) => {
+                const option = document.createElement('div');
+                option.className = 'formation-option';
+                option.innerHTML = `
+                    <input type="radio" id="formation-${index}" name="formation" value="${index}" ${currentFormationIndex === index ? 'checked' : ''}>
+                    <label for="formation-${index}">📐 ${formation.name} (${formation.coordinates.length} đỉnh)</label>
+                `;
+                option.querySelector('input').addEventListener('change', () => switchToFormation(index));
+                options.appendChild(option);
+            });
+            
+            if (formations.length > 0) {
+                selector.style.display = 'block';
+            }
+        }
+        
+        function addReducedFormationToReadMode(verticesData, hasColorData) {
+            if (!verticesData || verticesData.length === 0) return;
+            
+            // Parse coordinates và colors
+            const coordinates = verticesData.map(v => ({
+                x: v.x || 0,
+                y: v.y || 0,
+                z: v.z || 0
+            }));
+            
+            const colors = [];
+            if (hasColorData) {
+                verticesData.forEach(v => {
+                    if (v.color) {
+                        colors.push({
+                            r: v.color.r || 255,
+                            g: v.color.g || 255,
+                            b: v.color.b || 255,
+                            hex: v.color.hex || `#${[(v.color.r || 255), (v.color.g || 255), (v.color.b || 255)].map(c => c.toString(16).padStart(2, '0')).join('')}`
+                        });
+                    } else {
+                        colors.push(null);
+                    }
+                });
+            }
+            
+            // Normalize coordinates
+            const normalizedCoords = normalizeCoordinates(coordinates);
+            
+            // Tạo tên formation
+            const timestamp = Date.now();
+            const formationName = `Reduced_${verticesData.length}_${timestamp}`;
+            
+            // Tạo formation mới
+            const newFormation = {
+                name: formationName,
+                coordinates: normalizedCoords,
+                colors: hasColorData && colors.length > 0 ? colors : null,
+                hasColors: hasColorData && colors.length > 0,
+                totalVertices: verticesData.length
+            };
+            
+            formations.push(newFormation);
+            
+            // Cập nhật UI
+            updateStats(normalizedCoords.length, verticesData.length);
+            updateFormationSelector();
+            
+            // Tự động chuyển sang formation mới
+            switchToFormation(formations.length - 1);
+            
+            // Tự động chuyển sang mode Read nếu đang ở mode Reduce
+            if (currentMode === 'reduce') {
+                setTimeout(() => {
+                    switchMode('read');
+                }, 500);
+            }
+            
+            console.log(`✅ Đã thêm formation "${formationName}" vào mode Read`);
+        }
+        
+        function switchToFormation(index) {
+            if (index < 0 || index >= formations.length) return;
+            
+            currentFormationIndex = index;
+            const formation = formations[index];
+            jsonCoordinates = formation.coordinates;
+            jsonColors = formation.colors || [];
+            hasColors = formation.hasColors || false;
+            
+            createParticlesFromCoordinates();
+            
+            const infoDiv = document.getElementById('info');
+            const colorIcon = hasColors ? '🎨' : '🦋';
+            infoDiv.innerHTML = `${colorIcon} ${formation.name} (${formation.coordinates.length} điểm) ${colorIcon}`;
+            infoDiv.style.color = '#00FFFF';
+            
+            updateStats(formation.coordinates.length, formation.totalVertices);
+            updateFormationSelector();
+        }
+        
+        function updateStats(loadedCount, totalCount) {
+            const statsDiv = document.getElementById('stats');
+            statsDiv.innerHTML = `
+                <div>📊 Số đỉnh đã load: <strong>${loadedCount.toLocaleString()}</strong></div>
+                ${totalCount !== loadedCount ? `<div>📊 Tổng số đỉnh trong file: <strong>${totalCount.toLocaleString()}</strong></div>` : ''}
+            `;
+            statsDiv.style.display = 'block';
+        }
+        
+        function createParticlesFromCoordinates() {
+            if (!jsonCoordinates || jsonCoordinates.length === 0) return;
+            
+            particles.forEach(particle => {
+                scene.remove(particle);
+                if (particle.geometry) particle.geometry.dispose();
+                if (particle.material) particle.material.dispose();
+            });
+            particles = [];
+            
+            const actualParticleCount = Math.min(particleCount, jsonCoordinates.length);
+            
+            for (let i = 0; i < actualParticleCount; i++) {
+                const geometry = new THREE.SphereGeometry(0.08, 8, 8);
+                
+                const coordIndex = i % jsonCoordinates.length;
+                const targetCoord = jsonCoordinates[coordIndex];
+                
+                let particleColor = new THREE.Color().setHSL(0.5 + Math.random() * 0.1, 1, 0.5 + Math.random() * 0.3);
+                if (hasColors && jsonColors && jsonColors[coordIndex]) {
+                    const c = jsonColors[coordIndex];
+                    if (c.hex) {
+                        particleColor = new THREE.Color(c.hex);
+                    } else {
+                        particleColor = new THREE.Color(c.r / 255, c.g / 255, c.b / 255);
+                    }
+                }
+                
+                const material = new THREE.MeshBasicMaterial({
+                    color: particleColor,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                const particle = new THREE.Mesh(geometry, material);
+                
+                particle.position.x = (Math.random() - 0.5) * 30;
+                particle.position.y = (Math.random() - 0.5) * 30;
+                particle.position.z = (Math.random() - 0.5) * 30;
+                
+                particle.userData = {
+                    targetX: targetCoord.x,
+                    targetY: targetCoord.y,
+                    targetZ: targetCoord.z,
+                    velocityX: 0,
+                    velocityY: 0,
+                    velocityZ: 0,
+                    startTime: Math.random() * 3
+                };
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+            
+            console.log(`Created ${actualParticleCount} particles from ${jsonCoordinates.length} coordinates${hasColors ? ' with colors' : ''}`);
+        }
+        
+        // ========== MODE REDUCE: GLB Vertex Reduction ==========
+        let originalScene, originalCamera, originalRenderer, originalControls;
+        let reducedScene, reducedCamera, reducedRenderer, reducedControls;
+        let originalModel = null;
+        let reducedModel = null;
+        let originalVertices = [];
+        let reducedVertices = [];
+        let reducedVerticesWithColors = [];
+        let gltfLoader;
+        
+        function initReduceMode() {
+            setTimeout(() => {
+                const originalCanvas = document.getElementById('originalCanvas');
+                if (!originalCanvas) {
+                    console.error('Original canvas not found');
+                    return;
+                }
+                
+                originalScene = new THREE.Scene();
+                originalScene.background = new THREE.Color(0x1a1a1a);
+                
+                const width = originalCanvas.clientWidth || 800;
+                const height = originalCanvas.clientHeight || 600;
+                
+                originalCamera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+                originalCamera.position.set(5, 5, 5);
+                originalRenderer = new THREE.WebGLRenderer({ canvas: originalCanvas, antialias: true });
+                originalRenderer.setSize(width, height);
+                originalRenderer.setPixelRatio(window.devicePixelRatio);
+            
+                if (typeof THREE.OrbitControls !== 'undefined') {
+                    originalControls = new THREE.OrbitControls(originalCamera, originalCanvas);
+                    originalControls.enableDamping = true;
+                    originalControls.dampingFactor = 0.05;
+                }
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                originalScene.add(ambientLight);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(10, 10, 5);
+                originalScene.add(directionalLight);
+                
+                const gridHelper = new THREE.GridHelper(10, 10);
+                originalScene.add(gridHelper);
+
+                // Initialize reduced viewer
+                const reducedCanvas = document.getElementById('reducedCanvas');
+                if (!reducedCanvas) {
+                    console.error('Reduced canvas not found');
+                    return;
+                }
+                
+                reducedScene = new THREE.Scene();
+                reducedScene.background = new THREE.Color(0x1a1a1a);
+                
+                const reducedWidth = reducedCanvas.clientWidth || 800;
+                const reducedHeight = reducedCanvas.clientHeight || 600;
+                
+                reducedCamera = new THREE.PerspectiveCamera(75, reducedWidth / reducedHeight, 0.1, 1000);
+                reducedCamera.position.set(5, 5, 5);
+                reducedRenderer = new THREE.WebGLRenderer({ canvas: reducedCanvas, antialias: true });
+                reducedRenderer.setSize(reducedWidth, reducedHeight);
+                reducedRenderer.setPixelRatio(window.devicePixelRatio);
+            
+                if (typeof THREE.OrbitControls !== 'undefined') {
+                    reducedControls = new THREE.OrbitControls(reducedCamera, reducedCanvas);
+                    reducedControls.enableDamping = true;
+                    reducedControls.dampingFactor = 0.05;
+                }
+
+                const reducedAmbientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                reducedScene.add(reducedAmbientLight);
+                const reducedDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                reducedDirectionalLight.position.set(10, 10, 5);
+                reducedScene.add(reducedDirectionalLight);
+                
+                const reducedGridHelper = new THREE.GridHelper(10, 10);
+                reducedScene.add(reducedGridHelper);
+
+                if (typeof THREE.GLTFLoader !== 'undefined') {
+                    gltfLoader = new THREE.GLTFLoader();
+                    console.log('GLTFLoader initialized');
+                } else {
+                    console.error('GLTFLoader not available');
+                    showStatus('Lỗi: GLTFLoader chưa được load. Vui lòng tải lại trang.', 'error');
+                }
+
+                document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+                document.getElementById('reduceBtn').addEventListener('click', reduceVertices);
+                document.getElementById('reduceColorBtn').addEventListener('click', reduceVerticesWithColor);
+                document.getElementById('exportBtn').addEventListener('click', exportJSON);
+                document.getElementById('exportColorBtn').addEventListener('click', exportJSONWithColors);
+
+                window.addEventListener('resize', onWindowResize);
+                animate();
+                
+                console.log('Reduce mode initialized');
+            }, 100);
+        }
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                console.log('No file selected');
+                return;
+            }
+            
+            showStatus('Đang load file GLB...', 'info');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (gltfLoader) {
+                    gltfLoader.parse(e.target.result, '', (gltf) => {
+                        // Remove old model
+                        if (originalModel) {
+                            originalScene.remove(originalModel);
+                            originalModel.traverse((child) => {
+                                if (child.geometry) child.geometry.dispose();
+                                if (child.material) {
+                                    if (Array.isArray(child.material)) {
+                                        child.material.forEach(mat => mat.dispose());
+                                    } else {
+                                        child.material.dispose();
+                                    }
+                                }
+                            });
+                        }
+                        
+                        originalModel = gltf.scene;
+                        originalScene.add(originalModel);
+                        
+                        originalVertices = [];
+                        extractVertices(originalModel, originalVertices);
+                        
+                        const box = new THREE.Box3().setFromObject(originalModel);
+                        const center = box.getCenter(new THREE.Vector3());
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        
+                        if (maxDim > 0) {
+                            originalCamera.position.set(center.x + maxDim * 1.5, center.y + maxDim * 1.5, center.z + maxDim * 1.5);
+                            originalCamera.lookAt(center);
+                            if (originalControls) {
+                                originalControls.target.copy(center);
+                                originalControls.update();
+                            }
+                        }
+                        
+                        const originalTriangles = countTriangles(originalModel);
+                        updateInfo(originalVertices.length, 0, originalTriangles, 0);
+                        
+                        showStatus('Load file thành công!', 'success');
+                        originalRenderer.render(originalScene, originalCamera);
+                    }, (error) => {
+                        console.error('Error loading GLB:', error);
+                        showStatus('Lỗi khi load file GLB: ' + error.message, 'error');
+                    });
+                } else {
+                    showStatus('GLTFLoader chưa được khởi tạo!', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        function extractVertices(object, verticesArray) {
+            object.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const geometry = child.geometry;
+                    if (geometry.attributes && geometry.attributes.position) {
+                        const positions = geometry.attributes.position;
+                        const matrix = new THREE.Matrix4();
+                        child.updateMatrixWorld(true);
+                        matrix.copy(child.matrixWorld);
+                        
+                        for (let i = 0; i < positions.count; i++) {
+                            const vertex = new THREE.Vector3();
+                            vertex.fromBufferAttribute(positions, i);
+                            vertex.applyMatrix4(matrix);
+                            verticesArray.push({
+                                x: vertex.x,
+                                y: vertex.y,
+                                z: vertex.z
+                            });
+                        }
+                    }
+                }
+            });
+        }
+        
+        function getVertexColorFromTexture(mesh, vertexIndex, uv) {
+            try {
+                const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+                if (material && material.map) {
+                    const texture = material.map;
+                    if (texture.image && texture.image.width && texture.image.height) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = texture.image.width;
+                        canvas.height = texture.image.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(texture.image, 0, 0);
+                        
+                        if (uv) {
+                            const x = Math.floor(Math.max(0, Math.min(1, uv.x)) * canvas.width);
+                            const y = Math.floor(Math.max(0, Math.min(1, uv.y)) * canvas.height);
+                            const imageData = ctx.getImageData(x, y, 1, 1);
+                            return {
+                                r: imageData.data[0],
+                                g: imageData.data[1],
+                                b: imageData.data[2],
+                                hex: '#' + [imageData.data[0], imageData.data[1], imageData.data[2]]
+                                    .map(c => c.toString(16).padStart(2, '0')).join('')
+                            };
+                        }
+                    }
+                    if (texture.image && texture.image.data && texture.image.width && texture.image.height) {
+                        const { data, width, height } = texture.image;
+                        if (uv) {
+                            const x = Math.floor(Math.max(0, Math.min(1, uv.x)) * width);
+                            const y = Math.floor(Math.max(0, Math.min(1, uv.y)) * height);
+                            const idx = (y * width + x) * 4;
+                            if (idx + 2 < data.length) {
+                                const r = data[idx];
+                                const g = data[idx + 1];
+                                const b = data[idx + 2];
+                                return {
+                                    r,
+                                    g,
+                                    b,
+                                    hex: '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Error reading texture color:', e);
+            }
+            return null;
+        }
+        
+        function getMaterialColor(mesh) {
+            if (mesh.material) {
+                const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+                if (material && material.color) {
+                    return {
+                        r: Math.floor(material.color.r * 255),
+                        g: Math.floor(material.color.g * 255),
+                        b: Math.floor(material.color.b * 255),
+                        hex: '#' + material.color.getHexString()
+                    };
+                }
+            }
+            return null;
+        }
+
+        function reduceVertices() {
+            if (!originalModel) {
+                showStatus('Vui lòng load file GLB trước!', 'error');
+                return;
+            }
+
+            const targetVertices = parseInt(document.getElementById('vertexInput').value);
+            if (!targetVertices || targetVertices <= 0) {
+                showStatus('Số đỉnh không hợp lệ!', 'error');
+                return;
+            }
+
+            showStatus('Đang giảm đỉnh...', 'info');
+
+            const allVertices = [];
+            originalModel.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const geometry = child.geometry;
+                    if (geometry.attributes && geometry.attributes.position) {
+                        const positions = geometry.attributes.position;
+                        const uvs = geometry.attributes.uv;
+                        const vertexColorsAttr = geometry.attributes.color;
+                        const matrix = new THREE.Matrix4();
+                        child.updateMatrixWorld(true);
+                        matrix.copy(child.matrixWorld);
+
+                        let materialColor = null;
+                        if (child.material) {
+                            const material = Array.isArray(child.material) ? child.material[0] : child.material;
+                            if (material.color) {
+                                materialColor = {
+                                    r: Math.floor(material.color.r * 255),
+                                    g: Math.floor(material.color.g * 255),
+                                    b: Math.floor(material.color.b * 255),
+                                    hex: '#' + material.color.getHexString()
+                                };
+                            }
+                        }
+
+                        for (let i = 0; i < positions.count; i++) {
+                            const vertex = new THREE.Vector3();
+                            vertex.fromBufferAttribute(positions, i);
+                            vertex.applyMatrix4(matrix);
+                            
+                            const vertexData = {
+                                x: vertex.x,
+                                y: vertex.y,
+                                z: vertex.z
+                            };
+                            
+                            let vertexColor = null;
+                            
+                            if (vertexColorsAttr) {
+                                vertexColor = {
+                                    r: Math.floor(vertexColorsAttr.getX(i) * 255),
+                                    g: Math.floor(vertexColorsAttr.getY(i) * 255),
+                                    b: Math.floor(vertexColorsAttr.getZ(i) * 255),
+                                    hex: '#' + [
+                                        Math.floor(vertexColorsAttr.getX(i) * 255),
+                                        Math.floor(vertexColorsAttr.getY(i) * 255),
+                                        Math.floor(vertexColorsAttr.getZ(i) * 255)
+                                    ].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                            
+                            if (!vertexColor && uvs && child.material && child.material.map) {
+                                const uv = new THREE.Vector2();
+                                uv.fromBufferAttribute(uvs, i);
+                                vertexColor = getVertexColorFromTexture(child, i, uv);
+                            }
+                            
+                            if (vertexColor) {
+                                vertexData.color = vertexColor;
+                            } else if (materialColor) {
+                                vertexData.color = materialColor;
+                            } else {
+                                const normalizedY = (vertex.y + 10) / 20;
+                                vertexData.color = {
+                                    r: Math.floor(100 + normalizedY * 155),
+                                    g: Math.floor(150 + normalizedY * 105),
+                                    b: Math.floor(200 + normalizedY * 55),
+                                    hex: '#' + [
+                                        Math.floor(100 + normalizedY * 155),
+                                        Math.floor(150 + normalizedY * 105),
+                                        Math.floor(200 + normalizedY * 55)
+                                    ].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                            
+                            allVertices.push(vertexData);
+                        }
+                    }
+                }
+            });
+
+            reducedVertices.length = 0;
+            reducedVerticesWithColors.length = 0;
+            if (allVertices.length > targetVertices) {
+                const step = Math.ceil(allVertices.length / targetVertices);
+                for (let i = 0; i < allVertices.length; i += step) {
+                    reducedVertices.push({
+                        x: allVertices[i].x,
+                        y: allVertices[i].y,
+                        z: allVertices[i].z
+                    });
+                    reducedVerticesWithColors.push(allVertices[i]);
+                }
+            } else {
+                reducedVertices.push(...allVertices.map(v => ({x: v.x, y: v.y, z: v.z})));
+                reducedVerticesWithColors.push(...allVertices);
+            }
+            
+            if (reducedModel) {
+                reducedScene.remove(reducedModel);
+                if (reducedModel.geometry) reducedModel.geometry.dispose();
+                if (reducedModel.material) {
+                    if (Array.isArray(reducedModel.material)) {
+                        reducedModel.material.forEach(mat => mat.dispose());
+                    } else {
+                        reducedModel.material.dispose();
+                    }
+                }
+            }
+
+            if (reducedVertices.length > 0) {
+                const positions = new Float32Array(reducedVertices.length * 3);
+                for (let i = 0; i < reducedVertices.length; i++) {
+                    positions[i * 3] = reducedVertices[i].x;
+                    positions[i * 3 + 1] = reducedVertices[i].y;
+                    positions[i * 3 + 2] = reducedVertices[i].z;
+                }
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                const material = new THREE.PointsMaterial({
+                    color: 0x00FFFF,
+                    size: 0.1,
+                    sizeAttenuation: true,
+                    transparent: true,
+                    opacity: 0.9,
+                    blending: THREE.AdditiveBlending
+                });
+
+                reducedModel = new THREE.Points(geometry, material);
+                reducedScene.add(reducedModel);
+
+                const box = new THREE.Box3().setFromObject(reducedModel);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                
+                if (maxDim > 0) {
+                    reducedCamera.position.set(center.x + maxDim * 1.5, center.y + maxDim * 1.5, center.z + maxDim * 1.5);
+                    reducedCamera.lookAt(center);
+                    if (reducedControls) {
+                        reducedControls.target.copy(center);
+                        reducedControls.update();
+                    }
+                }
+            }
+
+            const originalTriangles = countTriangles(originalModel);
+            updateInfo(originalVertices.length, reducedVertices.length, originalTriangles, 0);
+
+            document.getElementById('exportBtn').disabled = false;
+            document.getElementById('exportColorBtn').disabled = false;
+            showStatus('Giảm đỉnh thành công!', 'success');
+            
+            // Tự động tạo formation trong mode Read
+            addReducedFormationToReadMode(reducedVertices, false);
+        }
+        
+        function reduceVerticesWithColor() {
+            if (!originalModel) {
+                showStatus('Vui lòng load file GLB trước!', 'error');
+                return;
+            }
+
+            const targetVertices = parseInt(document.getElementById('vertexInput').value);
+            if (!targetVertices || targetVertices <= 0) {
+                showStatus('Số đỉnh không hợp lệ!', 'error');
+                return;
+            }
+
+            showStatus('Đang giảm đỉnh với màu sắc...', 'info');
+
+            const allVertices = [];
+            originalModel.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const geometry = child.geometry;
+                    if (geometry.attributes && geometry.attributes.position) {
+                        const positions = geometry.attributes.position;
+                        const uvs = geometry.attributes.uv;
+                        const vertexColorsAttr = geometry.attributes.color;
+                        const matrix = new THREE.Matrix4();
+                        child.updateMatrixWorld(true);
+                        matrix.copy(child.matrixWorld);
+
+                        let materialColor = null;
+                        if (child.material) {
+                            const material = Array.isArray(child.material) ? child.material[0] : child.material;
+                            if (material.color) {
+                                materialColor = {
+                                    r: Math.floor(material.color.r * 255),
+                                    g: Math.floor(material.color.g * 255),
+                                    b: Math.floor(material.color.b * 255),
+                                    hex: '#' + material.color.getHexString()
+                                };
+                            }
+                        }
+
+                        for (let i = 0; i < positions.count; i++) {
+                            const vertex = new THREE.Vector3();
+                            vertex.fromBufferAttribute(positions, i);
+                            vertex.applyMatrix4(matrix);
+                            
+                            const vertexData = {
+                                x: vertex.x,
+                                y: vertex.y,
+                                z: vertex.z
+                            };
+                            
+                            let vertexColor = null;
+                            
+                            if (vertexColorsAttr) {
+                                vertexColor = {
+                                    r: Math.floor(vertexColorsAttr.getX(i) * 255),
+                                    g: Math.floor(vertexColorsAttr.getY(i) * 255),
+                                    b: Math.floor(vertexColorsAttr.getZ(i) * 255),
+                                    hex: '#' + [
+                                        Math.floor(vertexColorsAttr.getX(i) * 255),
+                                        Math.floor(vertexColorsAttr.getY(i) * 255),
+                                        Math.floor(vertexColorsAttr.getZ(i) * 255)
+                                    ].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                            
+                            if (!vertexColor && uvs && child.material && child.material.map) {
+                                const uv = new THREE.Vector2();
+                                uv.fromBufferAttribute(uvs, i);
+                                vertexColor = getVertexColorFromTexture(child, i, uv);
+                            }
+                            
+                            if (vertexColor) {
+                                vertexData.color = vertexColor;
+                            } else if (materialColor) {
+                                vertexData.color = materialColor;
+                            } else {
+                                const normalizedY = (vertex.y + 10) / 20;
+                                vertexData.color = {
+                                    r: Math.floor(100 + normalizedY * 155),
+                                    g: Math.floor(150 + normalizedY * 105),
+                                    b: Math.floor(200 + normalizedY * 55),
+                                    hex: '#' + [
+                                        Math.floor(100 + normalizedY * 155),
+                                        Math.floor(150 + normalizedY * 105),
+                                        Math.floor(200 + normalizedY * 55)
+                                    ].map(c => c.toString(16).padStart(2, '0')).join('')
+                                };
+                            }
+                            
+                            allVertices.push(vertexData);
+                        }
+                    }
+                }
+            });
+
+            reducedVertices.length = 0;
+            reducedVerticesWithColors.length = 0;
+            if (allVertices.length > targetVertices) {
+                const step = Math.ceil(allVertices.length / targetVertices);
+                for (let i = 0; i < allVertices.length; i += step) {
+                    reducedVertices.push({
+                        x: allVertices[i].x,
+                        y: allVertices[i].y,
+                        z: allVertices[i].z
+                    });
+                    reducedVerticesWithColors.push(allVertices[i]);
+                }
+            } else {
+                reducedVertices.push(...allVertices.map(v => ({x: v.x, y: v.y, z: v.z})));
+                reducedVerticesWithColors.push(...allVertices);
+            }
+            
+            if (reducedModel) {
+                reducedScene.remove(reducedModel);
+                if (reducedModel.geometry) reducedModel.geometry.dispose();
+                if (reducedModel.material) {
+                    if (Array.isArray(reducedModel.material)) {
+                        reducedModel.material.forEach(mat => mat.dispose());
+                    } else {
+                        reducedModel.material.dispose();
+                    }
+                }
+            }
+
+            if (reducedVerticesWithColors.length > 0) {
+                const positions = new Float32Array(reducedVerticesWithColors.length * 3);
+                const colors = new Float32Array(reducedVerticesWithColors.length * 3);
+                
+                for (let i = 0; i < reducedVerticesWithColors.length; i++) {
+                    const v = reducedVerticesWithColors[i];
+                    positions[i * 3] = v.x;
+                    positions[i * 3 + 1] = v.y;
+                    positions[i * 3 + 2] = v.z;
+                    
+                    const color = v.color || { r: 255, g: 255, b: 255 };
+                    colors[i * 3] = color.r / 255;
+                    colors[i * 3 + 1] = color.g / 255;
+                    colors[i * 3 + 2] = color.b / 255;
+                }
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                const material = new THREE.PointsMaterial({
+                    size: 0.1,
+                    sizeAttenuation: true,
+                    transparent: true,
+                    opacity: 0.9,
+                    vertexColors: true,
+                    blending: THREE.AdditiveBlending
+                });
+
+                reducedModel = new THREE.Points(geometry, material);
+                reducedScene.add(reducedModel);
+
+                const box = new THREE.Box3().setFromObject(reducedModel);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                
+                if (maxDim > 0) {
+                    reducedCamera.position.set(center.x + maxDim * 1.5, center.y + maxDim * 1.5, center.z + maxDim * 1.5);
+                    reducedCamera.lookAt(center);
+                    if (reducedControls) {
+                        reducedControls.target.copy(center);
+                        reducedControls.update();
+                    }
+                }
+            }
+
+            const originalTriangles = countTriangles(originalModel);
+            updateInfo(originalVertices.length, reducedVertices.length, originalTriangles, 0);
+
+            document.getElementById('exportBtn').disabled = false;
+            document.getElementById('exportColorBtn').disabled = false;
+            showStatus('Giảm đỉnh với màu sắc thành công!', 'success');
+            
+            // Tự động tạo formation trong mode Read với màu
+            addReducedFormationToReadMode(reducedVerticesWithColors, true);
+        }
+
+        function countTriangles(object) {
+            let count = 0;
+            object.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const geometry = child.geometry;
+                    if (geometry.index) {
+                        count += geometry.index.count / 3;
+                    } else if (geometry.attributes && geometry.attributes.position) {
+                        count += geometry.attributes.position.count / 3;
+                    }
+                }
+            });
+            return Math.floor(count);
+        }
+
+        function updateInfo(origV, redV, origT, redT) {
+            document.getElementById('originalVertices').textContent = origV.toLocaleString();
+            document.getElementById('reducedVertices').textContent = redV.toLocaleString();
+            document.getElementById('originalTriangles').textContent = origT.toLocaleString();
+            document.getElementById('reducedTriangles').textContent = redT.toLocaleString();
+            document.getElementById('infoBox').style.display = 'block';
+        }
+
+        function exportJSON() {
+            if (reducedVertices.length === 0) {
+                showStatus('Không có dữ liệu để xuất!', 'error');
+                return;
+            }
+
+            const data = {
+                metadata: {
+                    totalVertices: reducedVertices.length,
+                    exportDate: new Date().toISOString()
+                },
+                vertices: reducedVertices
+            };
+
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vertices_${reducedVertices.length}_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showStatus('Đã xuất JSON thành công!', 'success');
+        }
+        
+        function exportJSONWithColors() {
+            if (reducedVerticesWithColors.length === 0) {
+                showStatus('Không có dữ liệu để xuất!', 'error');
+                return;
+            }
+
+            const data = {
+                metadata: {
+                    totalVertices: reducedVerticesWithColors.length,
+                    exportDate: new Date().toISOString(),
+                    hasColors: true
+                },
+                vertices: reducedVerticesWithColors.map(v => ({
+                    x: v.x,
+                    y: v.y,
+                    z: v.z,
+                    color: v.color || {
+                        r: 255,
+                        g: 255,
+                        b: 255,
+                        hex: '#ffffff'
+                    }
+                }))
+            };
+
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vertices_colors_${reducedVerticesWithColors.length}_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showStatus('Đã xuất JSON với màu sắc thành công!', 'success');
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            setTimeout(() => {
+                if (type === 'success' || type === 'info') {
+                    statusDiv.style.display = 'none';
+                }
+            }, 3000);
+        }
+
+        function onWindowResize() {
+            if (currentMode === 'read') {
+                if (renderer && camera) {
+                    const width = window.innerWidth - 300;
+                    const height = window.innerHeight;
+                    camera.aspect = width / height;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(width, height);
+                }
+            } else {
+                const originalCanvas = document.getElementById('originalCanvas');
+                const reducedCanvas = document.getElementById('reducedCanvas');
+                
+                if (originalCanvas && originalRenderer && originalCamera) {
+                    const width = originalCanvas.clientWidth || 800;
+                    const height = originalCanvas.clientHeight || 600;
+                    originalCamera.aspect = width / height;
+                    originalCamera.updateProjectionMatrix();
+                    originalRenderer.setSize(width, height);
+                }
+
+                if (reducedCanvas && reducedRenderer && reducedCamera) {
+                    const width = reducedCanvas.clientWidth || 800;
+                    const height = reducedCanvas.clientHeight || 600;
+                    reducedCamera.aspect = width / height;
+                    reducedCamera.updateProjectionMatrix();
+                    reducedRenderer.setSize(width, height);
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (currentMode === 'read') {
+                const time = Date.now() * 0.001;
+                
+                particles.forEach((particle, i) => {
+                    if (time > particle.userData.startTime) {
+                        const dx = particle.userData.targetX - particle.position.x;
+                        const dy = particle.userData.targetY - particle.position.y;
+                        const dz = particle.userData.targetZ - particle.position.z;
+                        
+                        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                        
+                        const force = 0.005;
+                        const damping = 0.92;
+                        
+                        particle.userData.velocityX += dx * force;
+                        particle.userData.velocityY += dy * force;
+                        particle.userData.velocityZ += dz * force;
+                        
+                        const maxSpeed = 0.05;
+                        const speed = Math.sqrt(
+                            particle.userData.velocityX ** 2 + 
+                            particle.userData.velocityY ** 2 + 
+                            particle.userData.velocityZ ** 2
+                        );
+                        if (speed > maxSpeed) {
+                            particle.userData.velocityX = (particle.userData.velocityX / speed) * maxSpeed;
+                            particle.userData.velocityY = (particle.userData.velocityY / speed) * maxSpeed;
+                            particle.userData.velocityZ = (particle.userData.velocityZ / speed) * maxSpeed;
+                        }
+                        
+                        particle.userData.velocityX *= damping;
+                        particle.userData.velocityY *= damping;
+                        particle.userData.velocityZ *= damping;
+                        
+                        particle.position.x += particle.userData.velocityX;
+                        particle.position.y += particle.userData.velocityY;
+                        particle.position.z += particle.userData.velocityZ;
+                    }
+                    
+                    particle.material.opacity = 0.7 + Math.sin(time * 3 + i * 0.5) * 0.2;
+                });
+                
+                if (controls) {
+                    controls.update();
+                } else {
+                    scene.rotation.y = Math.sin(time * 0.2) * 0.2;
+                    scene.rotation.x = Math.sin(time * 0.15) * 0.1;
+                }
+                
+                if (renderer && scene && camera) {
+                    renderer.render(scene, camera);
+                }
+            } else {
+                if (originalControls) originalControls.update();
+                if (reducedControls) reducedControls.update();
+                
+                if (originalRenderer && originalScene && originalCamera) {
+                    originalRenderer.render(originalScene, originalCamera);
+                }
+                if (reducedRenderer && reducedScene && reducedCamera) {
+                    reducedRenderer.render(reducedScene, reducedCamera);
+                }
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            initReadMode();
+            initReduceMode();
+        });
+        
+        window.addEventListener('resize', onWindowResize);
+    </script>
 </body>
 </html>
